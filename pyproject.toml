@@ -1,0 +1,42 @@
+[project]
+name = "klever"
+version = "0.1.0a1"
+description = "Kit for Less-Effort Verification"
+readme = "README.md"
+authors = [{ name = "esynr3z", email = "esynr3z@gmail.com" }]
+license = { text = "Apache-2.0" }
+requires-python = ">=3.12,<3.15"
+keywords = [
+    "verification",
+    "UVM",
+    "SystemVerilog",
+    "cocotb",
+    "HDL",
+    "RTL",
+    "FPGA",
+    "ASIC",
+    "EDA",
+]
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+]
+dependencies = []
+
+[project.urls]
+Organization = "https://github.com/klever-verif"
+Repository = "https://github.com/klever-verif/klever.git"
+
+[project.scripts]
+klever = "klever:main"
+
+[build-system]
+requires = ["uv_build>=0.9.4,<0.10.0"]
+build-backend = "uv_build"

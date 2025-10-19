@@ -1,0 +1,31 @@
+{
+    "name": "klever-workspace",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "options": {
+            "--network": "host"
+        }
+    },
+    "remoteUser": "ubuntu",
+    "postCreateCommand": "git config --global --add safe.directory /workspaces/klever && uv sync --all-extras --dev",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "files.trimTrailingWhitespace": true,
+            },
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-python.debugpy",
+                "anysphere.pyright",
+                "tamasfe.even-better-toml",
+                "yzhang.markdown-all-in-one",
+                "charliermarsh.ruff",
+                "jock.svg",
+                "redhat.vscode-yaml",
+                "github.vscode-github-actions",
+                "gruntfuggly.todo-tree"
+            ]
+        }
+    }
+}

@@ -1,0 +1,51 @@
+fail_fast: true
+repos:
+  - repo: local
+    hooks:
+      - id: python-format
+        name: Python format
+        description: Run Python code formatting with ruff
+        entry: make format
+        language: system
+        types: [file, python]
+        stages: [pre-commit]
+
+      - id: python-lint
+        name: Python lint check
+        description: Run Python code linting with ruff
+        entry: make lint-fix
+        language: system
+        types: [file, python]
+        stages: [pre-commit]
+
+      - id: python-types
+        name: Python type check
+        description: Run Python code type checking with pyright
+        entry: make type-check
+        language: system
+        types: [file, python]
+        stages: [pre-commit]
+
+      - id: git-commit-style
+        name: Commit style check
+        description: Run commitizen to validate commit message
+        stages: [commit-msg]
+        entry: make check-commit
+        pass_filenames: false
+        language: system
+
+      - id: uv-lock
+        name: UV lock update
+        description: Run uv lock to update lock file
+        entry: uv lock
+        language: python
+        pass_filenames: false
+        files: ^(.*/)?(uv\.lock|pyproject\.toml)$
+
+      - id: python-test
+        name: Python testing
+        description: Run pytest to execute tests
+        entry: make test
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]

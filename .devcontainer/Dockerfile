@@ -4,7 +4,7 @@ FROM ubuntu:24.04
 # Install necessary system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    ca-certificates curl git nano openssh-client \
+    ca-certificates curl git nano openssh-client make libatomic1 bash-completion \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

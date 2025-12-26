@@ -25,7 +25,8 @@
                 "jock.svg",
                 "redhat.vscode-yaml",
                 "github.vscode-github-actions",
-                "gruntfuggly.todo-tree"
+                "gruntfuggly.todo-tree",
+                "openai.chatgpt"
             ]
         }
     }

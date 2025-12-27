@@ -28,7 +28,9 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
 ]
-dependencies = []
+dependencies = [
+    "cocotb>=2.0.1",
+]
 
 [project.urls]
 Organization = "https://github.com/klever-verif"

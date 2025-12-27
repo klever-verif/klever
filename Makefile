@@ -13,7 +13,7 @@ format:
 
 ## Check formatting
 format-check:
-	uv run ruff check --fix .
+	uv run ruff format --check .
 
 ## Lint (Ruff)
 lint:

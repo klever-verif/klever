@@ -1,32 +1,32 @@
 {
     "name": "klever-workspace",
     "build": {
-        "dockerfile": "Dockerfile",
-        "options": {
-            "--network": "host"
-        }
+        "dockerfile": "Dockerfile"
     },
+    "runArgs": ["--network=host"],
     "remoteUser": "ubuntu",
+    "updateRemoteUserUID": true,
     "postCreateCommand": "git config --global --add safe.directory /workspaces/klever",
     "postStartCommand": "make bootstrap",
     "customizations": {
         "vscode": {
             "settings": {
                 "files.trimTrailingWhitespace": true,
+                "extensions.verifySignature": false
             },
             "extensions": [
                 "ms-python.python",
                 "ms-python.vscode-pylance",
                 "ms-python.debugpy",
-                "anysphere.pyright",
+                "ms-pyright.pyright",
+                "charliermarsh.ruff",
                 "tamasfe.even-better-toml",
                 "yzhang.markdown-all-in-one",
                 "charliermarsh.ruff",
                 "jock.svg",
                 "redhat.vscode-yaml",
-                "github.vscode-github-actions",
                 "gruntfuggly.todo-tree",
-                "openai.chatgpt"
+                "Hudson-River-Trading.vscode-slang"
             ]
         }
     }

@@ -1,7 +1,7 @@
 [project]
 name = "klever"
 version = "0.1.0a1"
-description = "Kit for Less-Effort Verification"
+description = "Kit for Lightweight and Efficient Verification"
 readme = "README.md"
 authors = [{ name = "esynr3z", email = "esynr3z@gmail.com" }]
 license = { text = "Apache-2.0" }

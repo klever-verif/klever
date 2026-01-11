@@ -1,5 +1,5 @@
 # KLEVER
 
-Kit for Less-Effort Verification
+Kit for Lightweight and Efficient Verification in Python
 
 UNDER CONSTRUCTION

@@ -1,4 +1,3 @@
-# Use bash and fail fast
 .DEFAULT_GOAL := help
 
 ## Bootstrap project env from lockfile
@@ -11,31 +10,31 @@ bootstrap:
 format:
 	uv run ruff format .
 
-## Check formatting
+## Check formatting with Ruff
 format-check:
 	uv run ruff format --check .
 
-## Lint (Ruff)
+## Lint with Ruff
 lint:
 	uv run ruff check .
 
-## Fix linting
+## Fix linting with Ruff
 lint-fix:
 	uv run ruff check --fix .
 
-## Type check (Pyright via PyPI wrapper)
+## Type check with Pyright
 type-check:
 	uv run pyright
 
-## Run tests
+## Run tests with pytest
 test:
 	uv run pytest -n auto
 
-## Run tests with coverage
+## Run tests with coverage (pytest)
 test-coverage:
 	uv run pytest -n auto --cov=src --no-cov-on-fail --cov-report term-missing --cov-report html
 
-## Pre-commit on all files
+## Run pre-commit hooks on all files
 pre-commit:
 	uv run pre-commit run --all-files
 

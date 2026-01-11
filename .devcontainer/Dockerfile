@@ -1,5 +1,5 @@
 # ---- Verilator Builder -------------------------------------------------------
-FROM ubuntu:24.04 as verilator_builder
+FROM ubuntu:24.04 AS verilator_builder
 
 # Setup environment variables
 ENV VERILATOR_VERSION=v5.042 \
@@ -72,11 +72,14 @@ RUN chown -R ubuntu:ubuntu /opt
 # Install Codex
 RUN npm i -g @openai/codex
 
+# Switch to non-root user
+USER ubuntu
+
 # Install Claude Code
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
-# Switch to non-root user
-USER ubuntu
+# Install OpenCode
+RUN curl -fsSL https://opencode.ai/install | bash
 
 # Install uv
 ENV UV_VERSION=0.9.4

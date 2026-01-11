@@ -12,7 +12,10 @@
         "vscode": {
             "settings": {
                 "files.trimTrailingWhitespace": true,
-                "extensions.verifySignature": false
+                "extensions.verifySignature": false,
+                "terminal.integrated.commandsToSkipShell": [
+                    "-workbench.action.quickOpen"
+                ]
             },
             "extensions": [
                 "ms-python.python",
@@ -26,7 +29,8 @@
                 "jock.svg",
                 "redhat.vscode-yaml",
                 "gruntfuggly.todo-tree",
-                "Hudson-River-Trading.vscode-slang"
+                "Hudson-River-Trading.vscode-slang",
+                "sst-dev.opencode"
             ]
         }
     }

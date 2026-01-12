@@ -58,6 +58,12 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Ensure the devcontainer user exists
+RUN if ! id -u ubuntu >/dev/null 2>&1; then useradd -m -s /bin/bash ubuntu; fi
+
+# Ensure /workspaces exists and is writable
+RUN mkdir -p /workspaces && chown ubuntu:ubuntu /workspaces && chmod 775 /workspaces
+
 # Install Verilator
 ENV VERILATOR_INSTALL=/opt/verilator
 COPY --from=verilator_builder ${VERILATOR_INSTALL} ${VERILATOR_INSTALL}

@@ -4,9 +4,11 @@
         "dockerfile": "Dockerfile"
     },
     "runArgs": ["--network=host"],
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    "workspaceMount": "source=${localWorkspaceFolder}/..,target=/workspaces,type=bind",
     "remoteUser": "ubuntu",
     "updateRemoteUserUID": true,
-    "postCreateCommand": "git config --global --add safe.directory /workspaces/klever",
+    "postCreateCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
     "postStartCommand": "make bootstrap",
     "customizations": {
         "vscode": {

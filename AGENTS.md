@@ -14,7 +14,7 @@
 - `ruff` is used for linting and formatting
 - `pyright` is used for type checks
 - `pytest` is used for testing
-- Current python version is specified in @.python-version
+- Current python version is specified in `.python-version`
 
 ## Build, Test, and Dev Commands
 - Use `Makefile` in root to perform code management (lint, format, check, etc.)
@@ -27,6 +27,11 @@
 ## Testing Guidelines
 - TBD
 
-## Commit & PR Guidelines
+## Git Guidelines
 - Git history follows Conventional Commits (`feat: ...`, `fix: ...`, `ci: ...`). Match that style; scope is optional but encouraged.
 - Keep commits focused and linted; run `make check` before committing.
+- Suggest user to create a new branch for every new feature/fix.
+
+## Knowledge Storage
+- Follow `.memory/AGENTS.md` for per-branch knowledge storage rules and cleanup.
+- Maintain the global backlog in `.memory/TODO.md` as a simple bullet list.

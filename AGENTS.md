@@ -1,5 +1,7 @@
 # Repository Guidelines
 
+- All text artifacts must be in English (docs, commits, comments, etc.).
+
 ## Project Structure & Modules
 - Development container configuration in `.devcontainer`
 - Python package lives in `src/klever`

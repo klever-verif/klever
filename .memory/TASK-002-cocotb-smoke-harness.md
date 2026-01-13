@@ -70,3 +70,73 @@ This corresponds to Phase 1 in `.memory/PLAN.md`.
 - Can cocotb run without HDL simulation? (Try first)
 - If HDL needed: does Verilator require clock/reset or can module be completely empty?
 - Optimal cocotb.runner fixture structure for this project.
+
+## Implementation Notes (Completed)
+
+### Answers to Open Questions
+1. **Can cocotb run without HDL simulation?** NO - cocotb requires HDL sources and a simulator. It cannot run in a pure-Python mode.
+2. **Does Verilator require clock/reset?** NO - Verilator accepts a completely empty module with just a single input port (clk). No logic or actual clock generation is needed.
+3. **Optimal runner structure:** Use `test_dir` parameter to set working directory to `tests/`, allowing cocotb to import test modules from that directory.
+
+### Chosen Minimal Approach (FINAL - Using cocotb pytest plugin)
+- **Cocotb Version:** 2.1.0.dev (development) - required for pytest plugin support
+- **HDL Module:** `tests/hdl/dummy_top.sv` - Minimal SystemVerilog module with single clock input, no logic
+- **Test Structure (Using cocotb pytest plugin):**
+  - `tests/conftest.py` - Enables cocotb pytest plugin + defines `dummy_top` fixture (builds HDL)
+  - `tests/test_channels.py` - Contains:
+    - **ONE** pytest runner function with `@pytest.mark.cocotb_runner` marker
+    - Multiple async test functions (NO decorators needed - auto-discovered by plugin)
+- **Key Configuration:**
+  - Plugin enabled via `pytest_plugins = ("cocotb_tools.pytest.plugin",)` in conftest
+  - HDL fixture uses `hdl.sources.append()` and `hdl.build()`
+  - Runner uses `dummy_top.test_dir = Path(__file__).resolve().parent` to find test module
+  - Build artifacts go to `sim_build/tests/test_channels/test_channel_runner/` directory
+- **Integration:** Tests discovered by pytest automatically via plugin, run via `make test`
+
+### File Structure Created (FINAL)
+```
+tests/
+├── hdl/
+│   ├── dummy_top.sv          # Minimal SV module for Verilator
+│   └── README.md             # Explains purpose of HDL files
+├── conftest.py               # Enables plugin + dummy_top HDL fixture
+└── test_channels.py          # 1 pytest runner + N async cocotb tests
+```
+
+### Test Results
+✓ Work queue smoke test passes deterministically (capacity=1)
+✓ Multiple items test passes (capacity=2, multiple send/receive)
+✓ Integrated with pytest (discovered automatically via plugin)
+✓ Runs via `make test` command
+✓ No sleeps/timing tricks - pure deterministic tests
+✓ Tests real send/receive in cocotb context
+✓ HDL builds once per session, reused by all tests (efficient)
+✓ Detailed test summary via `--cocotb-summary` (configured in pyproject.toml)
+
+### Viewing Test Results
+```bash
+# Standard run - shows summary automatically (configured in pyproject.toml)
+make test
+
+# Output shows:
+# - 3 passed (1 pytest runner + 2 cocotb tests)
+# - Cocotb test summary table with individual test results:
+#   ** tests/test_channels.py::test_channel_runner::test_work_queue_smoke  PASS **
+#   ** tests/test_channels.py::test_channel_runner::test_work_queue_multiple_items  PASS **
+
+# Discover tests without running
+pytest --collect-only
+# Shows hierarchy: Runner -> Testbench -> Tests
+
+# Verbose mode with live output
+pytest tests/test_channels.py -s -v
+```
+
+### Architecture Benefits (FINAL - With cocotb pytest plugin)
+- **Zero duplication:** Write async test function once, plugin handles everything
+- **No decorators needed:** Async functions auto-discovered as cocotb tests (must start with `test_` and have `dut` arg)
+- **Pytest integration:** Full pytest features (fixtures, marks, parametrize, etc.) available
+- **Test discovery:** `pytest --collect-only` shows full hierarchy (Runner -> Testbench -> Tests)
+- **Easy to extend:** Just add new `async def test_xxx(dut)` function - that's it!
+- **Efficient:** HDL compiled once via fixture, reused by all tests
+- **Clean:** One file, one runner, N tests

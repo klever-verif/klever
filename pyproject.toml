@@ -29,7 +29,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
 ]
 dependencies = [
-    "cocotb>=2.0.1",
+    "cocotb @ git+https://github.com/cocotb/cocotb.git@master",
 ]
 
 [project.urls]
@@ -120,6 +120,10 @@ required-imports = ["from __future__ import annotations"]
 
 [tool.ruff.format]
 docstring-code-format = true
+
+[tool.pytest.ini_options]
+# Show cocotb test summary with detailed test case results
+addopts = "--cocotb-summary"
 
 [tool.pyright]
 exclude = [

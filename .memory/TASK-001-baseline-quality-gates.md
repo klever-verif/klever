@@ -15,20 +15,22 @@ This corresponds to Phase 0 in `.memory/PLAN.md`.
 1. Discover available targets via `make help` (or inspect Makefile targets).
 2. Run baseline commands (prefer Make targets):
    - `make lint`
-   - `make typecheck` or `make check`
-   - (Optional) `make test` if it is part of the standard gate.
+   - `make type-check`
+   - Do NOT run `make test`, `make format-check`, or `make check-commit` in this phase.
 3. If failures occur:
    - Classify each failure as either:
      - **Out-of-scope**: not caused by `src/klever/channel.py`.
-     - **In-scope**: caused by `src/klever/channel.py` or new channel test scaffolding (if already present).
+     - **In-scope**: caused by `src/klever/channel.py`.
    - Capture exact error output and the command used.
+   - Document failures and proceed; do not fix out-of-scope issues.
 4. Record baseline commands so later tasks run the same gates.
 
 ## Deliverables
-- A short written baseline report in `.memory/REVIEW-001.md` (or task notes in the PR/issue), containing:
+- A short written baseline report in `.memory/REVIEW-001.md` containing:
   - Commands executed
   - Pass/fail status
   - Failure classification (in-scope vs out-of-scope)
+  - Exact error output for any failures
 
 ## Definition of Done (DoD)
 - Baseline commands and results are recorded.

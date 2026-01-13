@@ -28,8 +28,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections import deque
-from types import TracebackType
-from typing import Any, Self, TypeVar, final
+from typing import TYPE_CHECKING, Any, Self, TypeVar, final
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 from cocotb.queue import Queue
 from cocotb.task import Task, current_task
@@ -42,11 +44,11 @@ T = TypeVar("T")
 
 # The type produced by receiver.
 # Covariant means Receiver[Derived] can be passed to someone expecting Receiver[Base].
-ReceiverType = TypeVar("ReceiverType", covariant=True)
+ReceiverType_co = TypeVar("ReceiverType_co", covariant=True)
 
 # The type accepted by producer.
 # Contravariant means Sender[Base] can be passed to someone expecting Sender[Derived].
-SenderType = TypeVar("SenderType", contravariant=True)
+SenderType_contra = TypeVar("SenderType_contra", contravariant=True)
 
 
 class DisconnectedError(Exception):
@@ -341,10 +343,10 @@ class _Endpoint[T](ABC):
 
 
 @final
-class Sender(_Endpoint[SenderType]):
+class Sender(_Endpoint[SenderType_contra]):
     """Endpoint for producer that allows to send items to the channel."""
 
-    def _init(self, channel: _Channel[SenderType]) -> None:
+    def _init(self, channel: _Channel[SenderType_contra]) -> None:
         super()._init(channel)
         if channel.only_single_producer and channel.senders_available.is_set():
             raise ValueError(
@@ -353,14 +355,14 @@ class Sender(_Endpoint[SenderType]):
             )
         channel.add_sender(self)
 
-    async def send(self, value: SenderType) -> None:
+    async def send(self, value: SenderType_contra) -> None:
         """Send a value to the channel."""
         if self._channel is None:
             raise ClosedError(f"Cannot send on closed endpoint {self!r}")
 
         await self._channel.send(self, value)
 
-    async def send_eventually(self, value: SenderType) -> None:
+    async def send_eventually(self, value: SenderType_contra) -> None:
         """Send a value to the channel, waiting for receivers if needed.
 
         This method will keep retrying to send until successful.
@@ -402,7 +404,7 @@ class Sender(_Endpoint[SenderType]):
             self._channel.remove_sender(self)
         self._channel = None
 
-    async def derive_receiver(self) -> Receiver[SenderType]:
+    async def derive_receiver(self) -> Receiver[SenderType_contra]:
         """Derive a new receiver endpoint bound to the same channel as this sender."""
         if self._channel is None:
             raise ClosedError(f"Cannot derive from closed endpoint {self!r}")
@@ -412,14 +414,15 @@ class Sender(_Endpoint[SenderType]):
 
 
 @final
-class Receiver(_Endpoint[ReceiverType]):
+class Receiver(_Endpoint[ReceiverType_co]):
     """Endpoint for receiver that allows to receive items from the channel."""
 
-    def _init(self, channel: _Channel[ReceiverType]) -> None:
+    def _init(self, channel: _Channel[ReceiverType_co]) -> None:
         super()._init(channel)
         if channel.only_single_consumer and channel.receivers_available.is_set():
             raise ValueError(
-                f"Cannot create new {self.__class__.__name__} endpoint, only single consumer is allowed for this channel"
+                f"Cannot create new {self.__class__.__name__} endpoint, "
+                "only single consumer is allowed for this channel"
             )
         channel.add_receiver(self)
 
@@ -427,21 +430,21 @@ class Receiver(_Endpoint[ReceiverType]):
         """Return the receiver as an iterator."""
         return self
 
-    async def __anext__(self) -> ReceiverType:
+    async def __anext__(self) -> ReceiverType_co:
         """Receive a value from the channel."""
         try:
             return await self.receive()
         except DisconnectedError as e:
             raise StopAsyncIteration from e
 
-    async def receive(self) -> ReceiverType:
+    async def receive(self) -> ReceiverType_co:
         """Receive a value from the channel, blocking if necessary."""
         if self._channel is None:
             raise ClosedError(f"Cannot receive on closed endpoint {self!r}")
 
         return await self._channel.receive(self)
 
-    async def receive_eventually(self) -> ReceiverType:
+    async def receive_eventually(self) -> ReceiverType_co:
         """Receive a value from the channel, waiting for senders if needed.
 
         This method will keep retrying to receive until successful.
@@ -480,7 +483,7 @@ class Receiver(_Endpoint[ReceiverType]):
             self._channel.remove_receiver(self)
         self._channel = None
 
-    async def derive_sender(self) -> Sender[ReceiverType]:
+    async def derive_sender(self) -> Sender[ReceiverType_co]:
         """Derive a new sender endpoint bound to the same channel as this receiver."""
         if self._channel is None:
             raise ClosedError(f"Cannot derive from closed endpoint {self!r}")

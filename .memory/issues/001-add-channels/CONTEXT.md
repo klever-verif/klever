@@ -74,7 +74,7 @@ Endpoints cannot be instantiated independently. They are produced only as part o
 
 A single construction entry point exists:
 
-* `create(...) -> (rx, tx)` (or `(receiver, sender)`; naming is interchangeable)
+* `create(...) -> (tx, rx)`
 
 The `create` call takes attributes that define channel semantics (buffering/broadcast/rendezvous, capacity, copy-on-send, etc.) and returns endpoints.
 
@@ -131,7 +131,7 @@ Iteration continues while the channel has active sender endpoints (i.e., iterati
 * `close()` to explicitly close this endpoint
 * Ability to access/derive the opposite endpoint:
 
-  * `tx()` or `sender()` extracted from the receiver, enabling reply/back-channel patterns without explicitly storing both ends everywhere
+  * `derive_sender()` to access the opposite endpoint (for reply/back-channel patterns)
 
 ### 4.2 Sender endpoint (`TX`)
 
@@ -156,7 +156,7 @@ Sender API mirrors the receiver where meaningful.
 * `close()` to explicitly close this endpoint
 * Ability to access/derive the opposite endpoint:
 
-  * `rx()` or `receiver()` extracted from the sender, enabling symmetric wiring patterns
+  * `derive_receiver()` to access the opposite endpoint (for symmetric wiring patterns)
 
 #### Non-iterable
 

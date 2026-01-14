@@ -4,7 +4,7 @@
 Create minimal runnable cocotb test environment (using Verilator) and add a deterministic smoke test for channels.
 
 ## Context
-This corresponds to Phase 1 in `.memory/PLAN.md`.
+This corresponds to Phase 1 in [](/.memory/PLAN.md).
 
 **Architecture rationale:** cocotb channels (`klever.channel`) require execution within cocotb's simulator context (similar to how asyncio requires an event loop). Since cocotb has no mock simulator, we must run a real simulator (Verilator) with a dummy HDL design to provide the execution environment for testing the pure-Python channel API.
 

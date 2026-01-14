@@ -33,5 +33,7 @@
 - Suggest user to create a new branch for every new feature/fix.
 
 ## Knowledge Storage
-- Follow `.memory/AGENTS.md` for per-branch knowledge storage rules and cleanup.
-- Maintain the global backlog in `.memory/TODO.md` as a simple bullet list.
+- Storage lives in `.memory/` and is persistent; rules: `.memory/AGENTS.md`.
+- Global backlog: `.memory/TODO.md` (simple bullet list).
+- Issue workspace: `.memory/issues/` (rules: `.memory/issues/AGENTS.md`).
+- Templates: `.memory/templates/`.

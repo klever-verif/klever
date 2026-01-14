@@ -21,7 +21,10 @@ This directory tracks work as one folder per issue.
 - Fill `Notes` only during implementation; append `NOTE-01`, `NOTE-02`, ...
 - Fill `Report` only when explicitly requested.
 - Keep text short, concrete, and free of contradictions.
+- Use only sections presented in templates (no custom ones)
 
 ## Reviews
-- Each thread groups one topic and is marked `open` or `resolved`.
+- Each thread groups one topic and is marked `open` or `resolved` by reviever.
 - A review is resolved when every `Q-..` has an `A-..` and the referenced changes are done.
+- Reviewer can touch only `Q-...` notes
+- Reviewee can touch only `A-...` notes

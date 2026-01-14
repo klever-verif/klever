@@ -40,7 +40,7 @@ pre-commit:
 
 ## Check commit messages
 check-commit:
-	uv run cz check --commit-msg-file .git/COMMIT_EDITMSG
+	uv run cz check --commit-msg-file "$$(git rev-parse --git-path COMMIT_EDITMSG)"
 
 ## Check everything
 check: format-check lint type-check check-commit

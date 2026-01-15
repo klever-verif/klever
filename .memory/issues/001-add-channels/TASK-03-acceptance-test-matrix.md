@@ -27,8 +27,8 @@
   ```markdown
   | Requirement | Modes | Scenario | Test Name | Location |
   |-------------|-------|----------|-----------|----------|
-  | Send after close raises ClosedError | all | Create channel, close sender, attempt send | test_send_after_sender_close | tests/test_channels.py |
-  | Async iterator stops when no senders | all | Receiver iterates while last sender closes | test_iterator_stops_on_disconnect | tests/test_channels.py |
+| Send after close raises ClosedError | all | Create channel, close sender, attempt send | example_send_after_close | tests/test_channels.py |
+| Async iterator stops when no senders | all | Receiver iterates while last sender closes | example_iterator_stops_on_disconnect | tests/test_channels.py |
   ```
 - Files: `.memory/issues/001-add-channels/PLAN.md`, `.memory/issues/001-add-channels/TASK-03-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
 - Commands: `make test` (after tests are implemented in TASK-04)
@@ -62,7 +62,7 @@
 |-------------|-------|----------|-----------|----------|
 | Clone sender endpoint | all | Create channel, clone sender, verify both bound to same channel | test_clone_sender | tests/test_channels.py |
 | Clone receiver endpoint | all | Create channel, clone receiver, verify both bound to same channel | test_clone_receiver | tests/test_channels.py |
-| Clone closed endpoint raises ValueError | all | Create channel, close sender, attempt clone, raises ValueError | test_clone_closed_endpoint_raises | tests/test_channels.py |
+| Clone closed endpoint raises ClosedError | all | Create channel, close sender, attempt clone, raises ClosedError | test_clone_closed_endpoint_raises | tests/test_channels.py |
 | Derive receiver from sender | all | Create channel, derive receiver from sender, verify bound to same channel | test_derive_receiver_from_sender | tests/test_channels.py |
 | Derive sender from receiver | all | Create channel, derive sender from receiver, verify bound to same channel | test_derive_sender_from_receiver | tests/test_channels.py |
 | Derive receiver from closed sender raises ClosedError | all | Create channel, close sender, attempt derive_receiver, raises ClosedError | test_derive_receiver_from_closed_sender_raises | tests/test_channels.py |
@@ -231,8 +231,8 @@ Total test cases: **82**
 ### Key Coverage Areas
 
 **Exception Types Verified:**
-- `ValueError`: Invalid capacity, clone/derive on closed, constraint violations
-- `ClosedError`: Operations on closed endpoints (send, receive, wait_for_*, derive)
+- `ValueError`: Invalid capacity, constraint violations
+- `ClosedError`: Operations on closed endpoints (send, receive, wait_for_*, clone, derive)
 - `DisconnectedError`: Operations when opposite side unavailable
 - `TypeError`: Invalid copy_on_send objects, direct endpoint instantiation
 - `StopAsyncIteration`: Iterator termination (via __anext__)

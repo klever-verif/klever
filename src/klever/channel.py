@@ -307,7 +307,7 @@ class _Endpoint[T](ABC):
     async def clone(self) -> Self:
         """Clone the endpoint to create another endpoint bound to the same channel."""
         if self._channel is None:
-            raise ValueError("Cannot clone a closed endpoint")
+            raise ClosedError("Cannot clone a closed endpoint")
         async with self._channel.lock:
             # lock is required because channel state is modified
             return self.__class__._create(self._channel)  # noqa: SLF001 # call of private method is intentional

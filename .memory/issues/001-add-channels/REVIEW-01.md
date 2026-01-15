@@ -1,5 +1,7 @@
 # REVIEW-01
 
+status: feedback_provided
+
 ## THREAD-01 (resolved)
 
 Q-01:

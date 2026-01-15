@@ -24,7 +24,9 @@ This directory tracks work as one folder per issue.
 - Use only sections presented in templates (no custom ones)
 
 ## Reviews
-- Each thread groups one topic and is marked `open` or `resolved` by reviever.
+- Each review file must include a `status: <value>` line right after the `# REVIEW-<nn>` title.
+- Allowed `status` values: `need_feedback`, `feedback_provided`, `done`.
+- Each thread groups one topic and is marked `open` or `resolved` by the reviewer.
 - A review is resolved when every `Q-..` has an `A-..` and the referenced changes are done.
-- Reviewer can touch only `Q-...` notes
-- Reviewee can touch only `A-...` notes
+- Reviewer may edit: `status:` (set `need_feedback` / `done`), thread headings, and `Q-...` blocks.
+- Reviewee may edit: `status:` (set `feedback_provided`) and `A-...` blocks.

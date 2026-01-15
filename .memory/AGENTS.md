@@ -5,7 +5,7 @@ This directory is a persistent, repo-local knowledge base.
 ## Structure
 - `.memory/TODO.md`: Global backlog (simple bullet list).
 - `.memory/templates/`: Canonical templates for plans, tasks, and reviews.
-- `.memory/issues/`: Per-issue working folders; rules live in `.memory/issues/AGENTS.md`.
+- `.memory/issues/`: Per-issue working folders.
 
 ## Persistence Rules
 - Everything under `.memory/` is persistent.

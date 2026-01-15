@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -ne 1 ]; then
-  echo "Usage: $0 <path-to-review-file-relative-to-repo-root>" >&2
+if [ "$#" -lt 2 ]; then
+  echo "Usage: $0 <path-to-review-file-relative-to-repo-root> <status-to-wait-for> [status-to-wait-for...]" >&2
   exit 2
 fi
 
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
 file_rel="$1"
 file_abs="$repo_root/$file_rel"
-
-shopt -s nocasematch
+expected_statuses=()
+for expected in "${@:2}"; do
+  expected_statuses+=("$(printf '%s' "$expected" | tr '[:upper:]' '[:lower:]')")
+done
 
 read_status() {
   local line
@@ -45,13 +47,11 @@ while true; do
     last="$status"
   fi
 
-  if [ "$status" = "done" ]; then
-    exit 0
-  fi
-
-  if [ "$status" = "need_feedback" ]; then
-    exit 0
-  fi
+  for expected in "${expected_statuses[@]}"; do
+    if [ -n "$expected" ] && [ "$status" = "$expected" ]; then
+      exit 0
+    fi
+  done
 
   sleep 1
 done

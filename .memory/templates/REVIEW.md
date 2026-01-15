@@ -1,6 +1,6 @@
 # REVIEW-<nn>
 
-status: feedback_provided
+status: clean
 
 ## THREAD-01 - open - <brief>
 

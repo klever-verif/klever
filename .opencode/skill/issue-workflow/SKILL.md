@@ -58,7 +58,9 @@ description: Use when you need to read/modify/create files within `.memory/issue
 - UPDATE ANY REVIEW `status:` ONLY AFTER FINISHING CURRENT THREAD EDITS.
 - DO NOT WRITE CODE DURING REVIEW UNLESS `status: clean` AND THE USER EXPLICITLY APPROVES IT.
 
-Run polling without asking permission when it is required.
+Run polling without asking permission only when the workflow step explicitly requires it.
+- Reviewer: after setting `status: wait_reviewee`.
+- Reviewee: after setting `status: wait_reviewer`.
 
 ### Reviewer Workflow
 1. Ensure the review file exists; if missing, create it from `.memory/templates/REVIEW.md` with `status: wait_reviewer`.
@@ -85,13 +87,15 @@ Run polling without asking permission when it is required.
 2. Wait for review questions (or completion):
    - `bash .opencode/skill/issue-workflow/poll_review.sh .memory/issues/<issue>/REVIEW-<nn>.md wait_reviewee clean`
 3. ALWAYS re-read the review document after polling is done. If there is evidence of a race, run it again.
-4. When `status: wait_reviewee`:
-   - Answer every question by filling the corresponding `A-...` blocks.
-   - Do not modify `Q-...` or thread headings.
-   - Do not write code, only provide answers.
-   - Set `status: wait_reviewer` after finishing edits.
-   - ALWAYS run polling without asking permission when status is updated with `wait_reviewer`:
-5. Repeat steps 2–3 until the reviewer sets `status: clean`.
+  4. When `status: wait_reviewee`:
+    - Answer every question by filling the corresponding `A-...` blocks.
+    - Do not modify `Q-...` or thread headings.
+    - Do not write code, only provide answers.
+    - Set `status: wait_reviewer` after finishing edits.
+    - ALWAYS run polling without asking permission after updating `status: wait_reviewer`:
+      - `bash .opencode/skill/issue-workflow/poll_review.sh .memory/issues/<issue>/REVIEW-<nn>.md wait_reviewee clean`
+  5. Repeat steps 2–3 until the reviewer sets `status: clean`.
+
 6. Ask the user for permission to do requested code changes during review.
    - If modifications are needed: set `status: wait_reviewer` after finishing edits.
    - If no changes are expected: ask permission to finish review.

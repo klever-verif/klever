@@ -41,53 +41,57 @@ description: Use when you need to read/modify/create files within `.memory/issue
 
 ## Review Rules
 - The user specifies whether you act as reviewer or reviewee. Ask if missing and follow only that role.
+- The review process is an automated process between two LLM agents synchronized with a polling script.
+- DO NOT STOP OR ASK USER UNLESS WORKFLOW ALLOWS IT
 
 ### Review file contract
 - Must match `.memory/templates/REVIEW.md`.
 - Must contain `status: <value>` directly under `# REVIEW-<nn>`.
-- Allowed status values: `need_feedback`, `feedback_provided`, `clean`, `done`.
+- Allowed status values: `wait_reviewer`, `wait_reviewee`, `clean`, `done`.
 - Ownership:
-  - Reviewer edits: thread headings (`open`/`resolved`), `Q-...`, and `status:` (`need_feedback`/`clean`/`done` with user approval).
-  - Reviewee edits: `A-...` and may set `status: feedback_provided`.
+  - Reviewer edits: thread headings (`open`/`resolved`), `Q-...`, and `status:` (`wait_reviewee`/`clean`/`done` with user approval).
+  - Reviewee edits: `A-...` and may set `status: wait_reviewer`.
 - Each thread groups one topic and is marked `open` or `resolved` by the reviewer.
-- A review is resolved when every `Q-..` has an `A-..` and referenced changes are complete.
-- Do not write code during review unless the user explicitly approves it.
-- Update any review status only after finishing current edits.
+- Threads are persistent and cannot be removed.
+- New threads and questions may be added manually by the user.
+- A review is resolved when every `Q-..` has an `A-..`, all threads are resolved, and referenced changes are complete.
+- UPDATE ANY REVIEW `status:` ONLY AFTER FINISHING CURRENT THREAD EDITS.
+- DO NOT WRITE CODE DURING REVIEW UNLESS `status: clean` AND THE USER EXPLICITLY APPROVES IT.
 
-### Polling
 Run polling without asking permission when it is required.
 
-- `bash .opencode/skill/issue-workflow/poll_review.sh <review-file> <status>`
-- `bash .opencode/skill/issue-workflow/poll_review.sh <review-file> <status1> <status2>`
-
 ### Reviewer Workflow
-1. Ensure the review file exists; if missing, create it from `.memory/templates/REVIEW.md` with `status: feedback_provided`.
-2. Check review file and review the requested code scope.
-3. For each topic, add a thread and questions:
+1. Ensure the review file exists; if missing, create it from `.memory/templates/REVIEW.md` with `status: wait_reviewer`.
+2. YOU DO NOT EDIT CODE
+3. Check review file and review the requested code scope.
+4. For each topic, add a thread and questions:
    - `## THREAD-XX - open - <brief>`
    - `Q-XX:` (one or more)
    - leave matching `A-XX:` empty
-4. If any questions/threads remain open, set `status: need_feedback` after finishing edits.
-5. Wait for responses:
-   - `bash .opencode/skill/issue-workflow/poll_review.sh .memory/issues/<issue>/REVIEW-<nn>.md feedback_provided`
-6. When `status: feedback_provided`, validate answers and any user-approved code changes.
-7. Close out:
-   - If follow-ups are needed: add new `Q-...`, keep threads `open`, set `status: need_feedback` after finishing edits.
-   - If satisfied with answers: mark all threads `resolved`, then set `status: clean` after finishing edits.
-8. Repeat steps 5–7 until `status: clean`.
-9. Reviewee may now start modifying the code only with user approval after `status: clean`.
-10. Ask the user for permission to set `status: done` or start polling again (step 5).
+5. If any questions/threads remain open, set `status: wait_reviewee` after finishing edits.
+6. ALWAYS run polling without asking permission when status is updated with `wait_reviewee`:
+   - `bash .opencode/skill/issue-workflow/poll_review.sh .memory/issues/<issue>/REVIEW-<nn>.md wait_reviewer`
+7. ALWAYS re-read the review document after polling is done. If there is evidence of a race, run it again.
+8. When `status: wait_reviewer`, validate answers and any user-approved code changes.
+9. If satisfied with answers (non-empty) within a thread - mark it as `resolved`.
+   - If follow-ups are needed: add new `Q-...`, keep threads `open`, set `status: wait_reviewee` after finishing edits and start polling.
+   - If satisfied with answers: make sure all threads `resolved`, then set `status: clean` after finishing edits.
+10. Repeat steps 5–7 until `status: clean`.
+11. Reviewee may now start modifying the code only with user approval after `status: clean`.
+12. Ask the user for permission to set `status: done` or start polling again (step 5).
 
 ### Reviewee Workflow
-1. Ensure the review file exists; if missing, create it from `.memory/templates/REVIEW.md` (leave `status: feedback_provided`).
+1. Ensure the review file exists; if missing, create it from `.memory/templates/REVIEW.md` (leave `status: wait_reviewer`).
 2. Wait for review questions (or completion):
-   - `bash .opencode/skill/issue-workflow/poll_review.sh .memory/issues/<issue>/REVIEW-<nn>.md need_feedback clean`
-3. When `status: need_feedback`:
+   - `bash .opencode/skill/issue-workflow/poll_review.sh .memory/issues/<issue>/REVIEW-<nn>.md wait_reviewee clean`
+3. ALWAYS re-read the review document after polling is done. If there is evidence of a race, run it again.
+4. When `status: wait_reviewee`:
    - Answer every question by filling the corresponding `A-...` blocks.
    - Do not modify `Q-...` or thread headings.
    - Do not write code, only provide answers.
-   - Set `status: feedback_provided` after finishing edits.
-4. Repeat steps 2–3 until the reviewer sets `status: clean`.
-5. Ask the user for permission to do requested code changes during review.
-   - If modifications are needed: set `status: feedback_provided` after finishing edits.
+   - Set `status: wait_reviewer` after finishing edits.
+   - ALWAYS run polling without asking permission when status is updated with `wait_reviewer`:
+5. Repeat steps 2–3 until the reviewer sets `status: clean`.
+6. Ask the user for permission to do requested code changes during review.
+   - If modifications are needed: set `status: wait_reviewer` after finishing edits.
    - If no changes are expected: ask permission to finish review.

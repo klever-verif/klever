@@ -1,6 +1,6 @@
 # REVIEW-<nn>
 
-status: clean
+status: wait_reviewer
 
 ## THREAD-01 - open - <brief>
 

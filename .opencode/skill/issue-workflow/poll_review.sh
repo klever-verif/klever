@@ -25,9 +25,10 @@ read_status() {
   fi
 
   while IFS= read -r line; do
-    line=${line#${line%%[![:space:]]*}}
-    if [[ "$line" == status:* ]]; then
-      status=${line#status:}
+    line=${line#$'\xef\xbb\xbf'}
+    if [[ "$line" =~ ^[[:space:]]*status[[:space:]]*:[[:space:]]*(.*)$ ]]; then
+      status=${BASH_REMATCH[1]}
+      status=${status%%#*}
       status=${status#${status%%[![:space:]]*}}
       status=${status%${status##*[![:space:]]}}
       status=${status,,}

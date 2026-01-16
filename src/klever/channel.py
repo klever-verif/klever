@@ -29,14 +29,17 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections import deque
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Self, TypeVar, final
+from typing import TYPE_CHECKING, Any, Self, TypeVar, cast, final
 
 if TYPE_CHECKING:
     from types import TracebackType
 
+from asyncio import CancelledError
+from contextlib import suppress
+
 from cocotb.queue import Queue
 from cocotb.task import Task, current_task
-from cocotb.triggers import Event, Lock
+from cocotb.triggers import Event, Lock, select
 
 from .types import SupportsCopy
 
@@ -92,6 +95,8 @@ class _Channel[T](ABC):
         self.lock = Lock()
         self.senders_available = Event()
         self.receivers_available = Event()
+        self._sender_disconnects = Event()
+        self._receiver_disconnects = Event()
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} @{id(self):#x}>"
@@ -111,12 +116,20 @@ class _Channel[T](ABC):
         self._open_senders -= 1
         if self._open_senders == 0:
             self.senders_available.clear()
+            self._sender_disconnects.set()
+            # Replace with a fresh Event so new waiters do not see the old disconnect.
+            # This prevents future waits from auto-completing on a past disconnect.
+            self._sender_disconnects = Event()
 
     def remove_receiver(self, _endpoint: _Endpoint[T]) -> None:
         """Remove a receiver from the channel."""
         self._open_receivers -= 1
         if self._open_receivers == 0:
             self.receivers_available.clear()
+            self._receiver_disconnects.set()
+            # Replace with a fresh Event so new waiters do not see the old disconnect.
+            # This prevents future waits from auto-completing on a past disconnect.
+            self._receiver_disconnects = Event()
 
     @property
     def copy_on_send(self) -> bool:
@@ -187,14 +200,23 @@ class _QueueChannel(_Channel[T]):
         if not self.receivers_available.is_set():
             raise DisconnectedError("Cannot send when there are no open receivers")
 
-        await self._buffer.put(value)
+        index, _result = await select(self._buffer.put(value), self._receiver_disconnects.wait())
+        if index != 0:
+            raise DisconnectedError("Cannot send when there are no open receivers")
 
     async def receive(self, _endpoint: _Endpoint[T]) -> T:
         """Receive a value from the channel."""
         if not self.senders_available.is_set():
             raise DisconnectedError("Cannot receive when there are no open senders")
 
-        return await self._buffer.get()
+        get_task = Task(self._buffer.get())
+        index, _result = await select(get_task, self._sender_disconnects.wait())
+        if index != 0:
+            get_task.cancel()
+            with suppress(CancelledError):
+                await get_task.join()
+            raise DisconnectedError("Cannot receive when there are no open senders")
+        return await get_task
 
 
 class _BroadcastChannel(_Channel[T]):
@@ -234,9 +256,8 @@ class _BroadcastChannel(_Channel[T]):
             raise DisconnectedError("Cannot send when there are no open receivers")
 
         for queue in tuple(self._queues.values()):  # create a snapshot of the queues to avoid race
-            if self._copy_on_send:
-                value = value.copy()  # type: ignore[reportAssignmentType] # already guarded above
-            queue.put_nowait(value)
+            copied_value = cast("T", cast("SupportsCopy", value).copy()) if self._copy_on_send else value
+            queue.put_nowait(copied_value)
 
     async def receive(self, endpoint: _Endpoint[T]) -> T:
         """Receive a value from the channel."""

@@ -10,12 +10,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from cocotb import start_soon
+from cocotb.triggers import Timer
 
 if TYPE_CHECKING:
     from cocotb.handle import SimHandleBase
     from cocotb_tools.pytest.hdl import HDL
 
-from klever.channel import ClosedError, Mode, Receiver, Sender, create
+from klever.channel import ClosedError, DisconnectedError, Mode, Receiver, Sender, create
 
 
 @pytest.mark.cocotb_runner  # Mark this function as cocotb runner (will load this module by default)
@@ -199,8 +201,267 @@ async def test_work_queue_multiple_items(dut: SimHandleBase) -> None:
 
 
 # =============================================================================
-# Category 2: Endpoint Lifecycle
+# Category 4: Send/Receive Operations (Queue)
 # =============================================================================
+
+
+async def test_basic_send_receive(dut: SimHandleBase) -> None:
+    """Verify basic send/receive works in queue mode.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=2)
+
+    await tx.send("alpha")
+    value = await rx.receive()
+
+    assert value == "alpha"
+
+    await tx.close()
+    await rx.close()
+
+
+async def test_queue_mpsc_pattern(dut: SimHandleBase) -> None:
+    """Verify multiple senders push into one queue receiver.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=4)
+    tx_two = await tx.clone()
+
+    await tx.send(1)
+    await tx_two.send(2)
+
+    received = {await rx.receive(), await rx.receive()}
+
+    assert received == {1, 2}
+
+    await tx.close()
+    await tx_two.close()
+    await rx.close()
+
+
+async def test_queue_spmc_pattern(dut: SimHandleBase) -> None:
+    """Verify single sender distributes values across multiple receivers.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=4)
+    rx_two = await rx.clone()
+
+    values = [10, 20, 30]
+    for value in values:
+        await tx.send(value)
+
+    received = {await rx.receive(), await rx_two.receive(), await rx.receive()}
+
+    assert received == set(values)
+
+    await tx.close()
+    await rx.close()
+    await rx_two.close()
+
+
+async def test_queue_backpressure(dut: SimHandleBase) -> None:
+    """Verify queue sender blocks when the buffer is full.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    await tx.send("first")
+
+    blocked_task = start_soon(tx.send("second"))
+    await Timer(1)
+
+    assert not blocked_task.done()
+
+    assert await rx.receive() == "first"
+    await Timer(1)
+
+    assert blocked_task.done()
+    assert blocked_task.exception() is None
+    await blocked_task
+
+    await tx.close()
+
+
+async def test_receive_blocks_on_empty(dut: SimHandleBase) -> None:
+    """Verify queue receiver blocks when the buffer is empty.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    blocked_task = start_soon(rx.receive())
+    await Timer(1)
+
+    assert not blocked_task.done()
+
+    await tx.send("ready")
+    await Timer(1)
+
+    assert blocked_task.done()
+    assert blocked_task.result() == "ready"
+
+    await tx.close()
+    await rx.close()
+
+
+async def test_queue_send_raises_when_receivers_gone(dut: SimHandleBase) -> None:
+    """Verify sending fails when all receivers are closed.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    await rx.close()
+
+    with pytest.raises(DisconnectedError):
+        await tx.send("payload")
+
+    await tx.close()
+
+
+async def test_queue_blocked_sender_wakes_on_disconnect(dut: SimHandleBase) -> None:
+    """Verify blocked sender wakes when all receivers close.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    await tx.send("first")
+
+    async def send_and_capture() -> str:
+        try:
+            await tx.send("second")
+        except DisconnectedError:
+            return "disconnected"
+        return "sent"
+
+    blocked_task = start_soon(send_and_capture())
+    await Timer(1)
+
+    assert not blocked_task.done()
+
+    await rx.close()
+    await Timer(1)
+
+    assert blocked_task.done()
+    assert blocked_task.result() == "disconnected"
+
+    await tx.close()
+
+
+async def test_queue_blocked_receiver_wakes_on_disconnect(dut: SimHandleBase) -> None:
+    """Verify blocked receiver wakes when all senders close.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    async def receive_and_capture() -> str:
+        try:
+            await rx.receive()
+        except DisconnectedError:
+            return "disconnected"
+        return "received"
+
+    blocked_task = start_soon(receive_and_capture())
+    await Timer(1)
+
+    assert not blocked_task.done()
+
+    await tx.close()
+    await Timer(1)
+
+    assert blocked_task.done()
+    assert blocked_task.result() == "disconnected"
+
+    await rx.close()
+
+
+# =============================================================================
+# Category 12: Concurrency & Race Conditions (Queue)
+# =============================================================================
+
+
+async def test_queue_concurrent_sends(dut: SimHandleBase) -> None:
+    """Verify concurrent senders deliver all values correctly.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=4)
+    tx_two = await tx.clone()
+
+    tasks = [
+        start_soon(tx.send("a")),
+        start_soon(tx_two.send("b")),
+        start_soon(tx.send("c")),
+    ]
+
+    await Timer(1)
+
+    for task in tasks:
+        assert task.done()
+
+    received = {await rx.receive(), await rx.receive(), await rx.receive()}
+
+    assert received == {"a", "b", "c"}
+
+    await tx.close()
+    await tx_two.close()
+    await rx.close()
+
+
+async def test_queue_concurrent_receives(dut: SimHandleBase) -> None:
+    """Verify concurrent receivers each get distinct values.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=4)
+    rx_two = await rx.clone()
+
+    for value in [1, 2, 3]:
+        await tx.send(value)
+
+    tasks = [
+        start_soon(rx.receive()),
+        start_soon(rx_two.receive()),
+        start_soon(rx.receive()),
+    ]
+
+    await Timer(1)
+
+    assert all(task.done() for task in tasks)
+
+    received = {task.result() for task in tasks}
+
+    assert received == {1, 2, 3}
+
+    await tx.close()
+    await rx.close()
+    await rx_two.close()
 
 
 async def test_clone_sender(dut: SimHandleBase) -> None:

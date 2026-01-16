@@ -3,7 +3,7 @@
 ## Brief
 - Goal: Implement queue-mode behavioral contracts from the acceptance matrix (send/receive semantics, blocking behavior, disconnect safety, and concurrency).
 - Effort: 4–6h
-- Status: todo
+- Status: done
 
 ## Details
 - Steps:
@@ -35,4 +35,6 @@
 ## Notes
 
 ## Report
-- 
+- Added queue blocking and disconnect-safety tests (`test_receive_blocks_on_empty`, `test_queue_send_raises_when_receivers_gone`).
+- Updated queue receive cancellation cleanup, disconnect wakeup comments, and tightened broadcast copy typing in `src/klever/channel.py`.
+- Verified with `uv run pytest tests/test_channels.py -k 'queue_' -v` and `make check`.

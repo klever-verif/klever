@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections import deque
+from enum import Enum
 from typing import TYPE_CHECKING, Any, Self, TypeVar, final
 
 if TYPE_CHECKING:
@@ -49,6 +50,14 @@ ReceiverType_co = TypeVar("ReceiverType_co", covariant=True)
 # The type accepted by producer.
 # Contravariant means Sender[Base] can be passed to someone expecting Sender[Derived].
 SenderType_contra = TypeVar("SenderType_contra", contravariant=True)
+
+
+class Mode(Enum):
+    """Channel mode."""
+
+    RENDEZVOUS = "rendezvous"
+    BROADCAST = "broadcast"
+    QUEUE = "queue"
 
 
 class DisconnectedError(Exception):
@@ -124,6 +133,12 @@ class _Channel[T](ABC):
         """Only single consumer setting."""
         return self._only_single_consumer
 
+    @property
+    @abstractmethod
+    def mode(self) -> Mode:
+        """Channel mode."""
+        raise NotImplementedError("mode is not implemented")
+
     @abstractmethod
     async def send(self, _endpoint: _Endpoint[T], value: T) -> None:
         """Send a value to the channel."""
@@ -156,6 +171,11 @@ class _QueueChannel(_Channel[T]):
     def capacity(self) -> int:
         """Capacity of the channel."""
         return self._capacity
+
+    @property
+    def mode(self) -> Mode:
+        """Channel mode."""
+        return Mode.QUEUE
 
     async def send(self, _endpoint: _Endpoint[T], value: T) -> None:
         """Send a value to the channel, blocking if necessary."""
@@ -200,6 +220,11 @@ class _BroadcastChannel(_Channel[T]):
         super().remove_receiver(endpoint)
         self._queues.pop(endpoint)
 
+    @property
+    def mode(self) -> Mode:
+        """Channel mode."""
+        return Mode.BROADCAST
+
     async def send(self, _endpoint: _Endpoint[T], value: T) -> None:
         """Send a value to the channel."""
         if self._copy_on_send and not isinstance(value, SupportsCopy):
@@ -231,6 +256,11 @@ class _RendezvousChannel(_Channel[T]):
         super().__init__(**kwargs)
         self._senders: deque[tuple[T, Event, Task]] = deque()
         self._receivers: deque[tuple[Event, Task]] = deque()
+
+    @property
+    def mode(self) -> Mode:
+        """Channel mode."""
+        return Mode.RENDEZVOUS
 
     async def send(self, _endpoint: _Endpoint[T], value: T) -> None:
         """Send a value to the channel."""
@@ -316,6 +346,13 @@ class _Endpoint[T](ABC):
     def is_closed(self) -> bool:
         """Whether the endpoint is closed."""
         return self._channel is None
+
+    @property
+    def mode(self) -> Mode:
+        """Channel mode."""
+        if self._channel is None:
+            raise ClosedError(f"Cannot get mode from closed endpoint {self!r}")
+        return self._channel.mode
 
     def same_channel(self, other: Self) -> bool:
         """Check if the endpoint is bound to the same channel."""

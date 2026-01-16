@@ -3,7 +3,7 @@
 ## Brief
 - Goal: Establish deterministic cocotb/pytest patterns in `tests/test_channels.py` and lock down `create()` mode selection contracts from the acceptance matrix.
 - Effort: 2–3h
-- Status: todo
+- Status: done
 
 ## Details
 - Steps:
@@ -30,5 +30,7 @@
 
 ## Notes
 
+NOTE-01: All 5 category 1 tests implemented and passing. Tests use public `mode` property and `Mode` enum as required. No production code changes needed.
+
 ## Report
-- 
+-

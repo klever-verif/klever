@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from cocotb.handle import SimHandleBase
     from cocotb_tools.pytest.hdl import HDL
 
-from klever.channel import Mode, Receiver, Sender, create
+from klever.channel import ClosedError, Mode, Receiver, Sender, create
 
 
 @pytest.mark.cocotb_runner  # Mark this function as cocotb runner (will load this module by default)
@@ -41,7 +41,7 @@ def test_channel_runner(dummy_top: HDL) -> None:
 # =============================================================================
 
 
-async def test_work_queue_smoke(dut: SimHandleBase) -> None:  # noqa: ARG001
+async def test_work_queue_smoke(dut: SimHandleBase) -> None:
     """Smoke test: work queue with capacity=1.
 
     Tests basic send/receive operation with a single-capacity queue channel.
@@ -72,7 +72,7 @@ async def test_work_queue_smoke(dut: SimHandleBase) -> None:  # noqa: ARG001
 # =============================================================================
 
 
-async def test_create_queue_channel(dut: SimHandleBase) -> None:  # noqa: ARG001
+async def test_create_queue_channel(dut: SimHandleBase) -> None:
     """Verify queue channel creation sets Mode.QUEUE on endpoints.
 
     Tests that create(capacity=10) produces endpoints with mode == Mode.QUEUE.
@@ -90,7 +90,7 @@ async def test_create_queue_channel(dut: SimHandleBase) -> None:  # noqa: ARG001
     await rx.close()
 
 
-async def test_create_broadcast_channel(dut: SimHandleBase) -> None:  # noqa: ARG001
+async def test_create_broadcast_channel(dut: SimHandleBase) -> None:
     """Verify broadcast channel creation sets Mode.BROADCAST on endpoints.
 
     Tests that create(broadcast=True) produces endpoints with mode == Mode.BROADCAST.
@@ -108,7 +108,7 @@ async def test_create_broadcast_channel(dut: SimHandleBase) -> None:  # noqa: AR
     await rx.close()
 
 
-async def test_create_rendezvous_channel(dut: SimHandleBase) -> None:  # noqa: ARG001
+async def test_create_rendezvous_channel(dut: SimHandleBase) -> None:
     """Verify rendezvous channel creation sets Mode.RENDEZVOUS on endpoints.
 
     Tests that create(capacity=0) produces endpoints with mode == Mode.RENDEZVOUS.
@@ -126,7 +126,7 @@ async def test_create_rendezvous_channel(dut: SimHandleBase) -> None:  # noqa: A
     await rx.close()
 
 
-async def test_create_returns_tx_rx_order(dut: SimHandleBase) -> None:  # noqa: ARG001
+async def test_create_returns_tx_rx_order(dut: SimHandleBase) -> None:
     """Verify create() returns tuple in (Sender, Receiver) order.
 
     Tests that the first element is a Sender and the second is a Receiver.
@@ -148,7 +148,7 @@ async def test_create_returns_tx_rx_order(dut: SimHandleBase) -> None:  # noqa: 
     await rx.close()
 
 
-async def test_queue_capacity_validation(dut: SimHandleBase) -> None:  # noqa: ARG001
+async def test_queue_capacity_validation(dut: SimHandleBase) -> None:
     """Verify ValueError is raised for invalid queue capacity.
 
     Tests that create(capacity=-1) raises ValueError when broadcast=False.
@@ -159,7 +159,7 @@ async def test_queue_capacity_validation(dut: SimHandleBase) -> None:  # noqa: A
 
     """
     # Negative capacity should raise ValueError
-    with pytest.raises(ValueError):  # noqa: PT011
+    with pytest.raises(ValueError):
         create(capacity=-1)
 
     # Zero capacity is valid (creates rendezvous channel)
@@ -169,7 +169,7 @@ async def test_queue_capacity_validation(dut: SimHandleBase) -> None:  # noqa: A
     await rx.close()
 
 
-async def test_work_queue_multiple_items(dut: SimHandleBase) -> None:  # noqa: ARG001
+async def test_work_queue_multiple_items(dut: SimHandleBase) -> None:
     """Smoke test: work queue with multiple send/receive operations.
 
     Tests sending and receiving multiple values through the same channel.
@@ -196,3 +196,395 @@ async def test_work_queue_multiple_items(dut: SimHandleBase) -> None:  # noqa: A
     # Cleanup
     await tx.close()
     await rx.close()
+
+
+# =============================================================================
+# Category 2: Endpoint Lifecycle
+# =============================================================================
+
+
+async def test_clone_sender(dut: SimHandleBase) -> None:
+    """Verify cloning a sender produces a new sender on the same channel.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    tx_clone = await tx.clone()
+
+    assert tx.same_channel(tx_clone) is True
+
+    await tx_clone.close()
+    await tx.close()
+    await rx.close()
+
+
+async def test_clone_receiver(dut: SimHandleBase) -> None:
+    """Verify cloning a receiver produces a new receiver on the same channel.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    rx_clone = await rx.clone()
+
+    assert rx.same_channel(rx_clone) is True
+
+    await rx_clone.close()
+    await tx.close()
+    await rx.close()
+
+
+async def test_clone_closed_endpoint_raises(dut: SimHandleBase) -> None:
+    """Verify cloning a closed endpoint raises ClosedError.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    await tx.close()
+
+    with pytest.raises(ClosedError):
+        await tx.clone()
+
+    await rx.close()
+
+
+async def test_clone_closed_receiver_raises(dut: SimHandleBase) -> None:
+    """Verify cloning a closed receiver raises ClosedError.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    await rx.close()
+
+    with pytest.raises(ClosedError):
+        await rx.clone()
+
+    await tx.close()
+
+
+async def test_derive_receiver_from_sender(dut: SimHandleBase) -> None:
+    """Verify a receiver can be derived from a sender on the same channel.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    derived = await tx.derive_receiver()
+
+    assert derived.same_channel(rx) is True
+
+    await derived.close()
+    await tx.close()
+    await rx.close()
+
+
+async def test_derive_sender_from_receiver(dut: SimHandleBase) -> None:
+    """Verify a sender can be derived from a receiver on the same channel.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    derived = await rx.derive_sender()
+
+    assert derived.same_channel(tx) is True
+
+    await derived.close()
+    await tx.close()
+    await rx.close()
+
+
+async def test_derive_receiver_from_closed_sender_raises(dut: SimHandleBase) -> None:
+    """Verify derive_receiver on a closed sender raises ClosedError.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    await tx.close()
+
+    with pytest.raises(ClosedError):
+        await tx.derive_receiver()
+
+    await rx.close()
+
+
+async def test_derive_sender_from_closed_receiver_raises(dut: SimHandleBase) -> None:
+    """Verify derive_sender on a closed receiver raises ClosedError.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    await rx.close()
+
+    with pytest.raises(ClosedError):
+        await rx.derive_sender()
+
+    await tx.close()
+
+
+async def test_close_sender(dut: SimHandleBase) -> None:
+    """Verify closing a sender marks it as closed.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    await tx.close()
+
+    assert tx.is_closed is True
+
+    await rx.close()
+
+
+async def test_close_receiver(dut: SimHandleBase) -> None:
+    """Verify closing a receiver marks it as closed.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    await rx.close()
+
+    assert rx.is_closed is True
+
+    await tx.close()
+
+
+async def test_close_idempotent(dut: SimHandleBase) -> None:
+    """Verify closing an endpoint multiple times is a no-op.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    await tx.close()
+    await tx.close()
+
+    assert tx.is_closed is True
+
+    await rx.close()
+
+
+async def test_context_manager_closes(dut: SimHandleBase) -> None:
+    """Verify async context manager closes endpoint on exit.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    async with tx:
+        assert tx.is_closed is False
+
+    assert tx.is_closed is True
+
+    await rx.close()
+
+
+# =============================================================================
+# Category 3: Single Producer/Consumer Constraints
+# =============================================================================
+
+
+async def test_single_producer_prevents_clone(dut: SimHandleBase) -> None:
+    """Verify only_single_producer prevents cloning a sender.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1, only_single_producer=True)
+
+    with pytest.raises(ValueError):
+        await tx.clone()
+
+    await tx.close()
+    await rx.close()
+
+
+async def test_single_producer_prevents_derive(dut: SimHandleBase) -> None:
+    """Verify only_single_producer prevents deriving a sender.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1, only_single_producer=True)
+
+    with pytest.raises(ValueError):
+        await rx.derive_sender()
+
+    await tx.close()
+    await rx.close()
+
+
+async def test_single_consumer_prevents_clone(dut: SimHandleBase) -> None:
+    """Verify only_single_consumer prevents cloning a receiver.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1, only_single_consumer=True)
+
+    with pytest.raises(ValueError):
+        await rx.clone()
+
+    await tx.close()
+    await rx.close()
+
+
+async def test_single_consumer_prevents_derive(dut: SimHandleBase) -> None:
+    """Verify only_single_consumer prevents deriving a receiver.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1, only_single_consumer=True)
+
+    with pytest.raises(ValueError):
+        await tx.derive_receiver()
+
+    await tx.close()
+    await rx.close()
+
+
+# =============================================================================
+# Category 15: Edge Cases
+# =============================================================================
+
+
+async def test_same_channel_returns_true(dut: SimHandleBase) -> None:
+    """Verify same_channel returns True for endpoints from the same channel.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    tx_clone = await tx.clone()
+
+    assert tx.same_channel(tx_clone) is True
+
+    await tx_clone.close()
+    await tx.close()
+    await rx.close()
+
+
+async def test_same_channel_returns_false(dut: SimHandleBase) -> None:
+    """Verify same_channel returns False for endpoints from different channels.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx_one, rx_one = create(capacity=1)
+    tx_two, rx_two = create(capacity=1)
+
+    assert tx_one.same_channel(tx_two) is False
+
+    await tx_one.close()
+    await rx_one.close()
+    await tx_two.close()
+    await rx_two.close()
+
+
+async def test_same_channel_false_on_closed(dut: SimHandleBase) -> None:
+    """Verify same_channel returns False if an endpoint is closed.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    tx_clone = await tx.clone()
+    await tx.close()
+
+    assert tx.same_channel(tx_clone) is False
+
+    await tx_clone.close()
+    await rx.close()
+
+
+async def test_endpoint_repr_closed(dut: SimHandleBase) -> None:
+    """Verify repr of a closed endpoint indicates closed state.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    await tx.close()
+
+    assert "closed" in repr(tx)
+
+    await rx.close()
+
+
+async def test_endpoint_repr_shows_channel(dut: SimHandleBase) -> None:
+    """Verify repr of an open endpoint shows channel binding.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    tx, rx = create(capacity=1)
+
+    assert "bound to" in repr(tx)
+
+    await tx.close()
+    await rx.close()
+
+
+async def test_cannot_instantiate_sender_directly(dut: SimHandleBase) -> None:
+    """Verify Sender cannot be instantiated directly.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    with pytest.raises(TypeError):
+        Sender()
+
+
+async def test_cannot_instantiate_receiver_directly(dut: SimHandleBase) -> None:
+    """Verify Receiver cannot be instantiated directly.
+
+    Args:
+        dut: Device under test (required by cocotb but unused for channel tests).
+
+    """
+    with pytest.raises(TypeError):
+        Receiver()

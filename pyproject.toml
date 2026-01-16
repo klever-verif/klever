@@ -113,6 +113,8 @@ ignore = [
     "PLR2004", # magic-value-comparison
     "E712",    # true-false-comparison
     "SLF001",  # private-member-access
+    "PT011",   # pytest-raises-too-broad
+    "ARG001",  # unused-function-argument
 ]
 
 [tool.ruff.lint.isort]

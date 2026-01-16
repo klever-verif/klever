@@ -3,7 +3,7 @@
 ## Brief
 - Goal: Lock down endpoint lifecycle and single-producer/consumer constraints via deterministic tests aligned with the acceptance matrix.
 - Effort: 3–4h
-- Status: todo
+- Status: done
 
 ## Details
 - Steps:
@@ -36,5 +36,12 @@
 
 ## Notes
 
+NOTE-01: Added category 2/3/15 tests in `tests/test_channels.py`. Ran `uv run pytest tests/test_channels.py -k 'clone or derive or close or single_ or same_channel or repr or instantiate' -v`; all 22 selected cocotb tests passed.
+NOTE-02: Added `PT011` ignore for `tests/**` in `pyproject.toml`, removed inline `# noqa: PT011` markers, and re-ran `uv run pytest tests/test_channels.py -k 'clone or derive or close or single_ or same_channel or repr or instantiate or queue_capacity_validation' -v` (23 tests passed).
+NOTE-03: Kept `dut` argument to preserve cocotb plugin usage and added `ARG001` ignore for `tests/**` in `pyproject.toml`; re-ran `uv run pytest tests/test_channels.py -k 'clone or derive or close or single_ or same_channel or repr or instantiate or queue_capacity_validation' -v` (23 tests passed).
+NOTE-04: Added `test_clone_closed_receiver_raises` and removed cross-type `same_channel` assertion per review feedback; verified `PT011`/`ARG001` only in `per-file-ignores`. Re-ran `uv run pytest tests/test_channels.py -k 'clone or derive or close or single_ or same_channel or repr or instantiate or queue_capacity_validation' -v` (24 tests passed).
+
 ## Report
-- 
+- Added lifecycle/constraints/edge-case tests for endpoints, including closed receiver clone coverage.
+- Kept ruff ignores for `PT011`/`ARG001` scoped to `tests/**` and removed cross-type `same_channel` assertion after review.
+- Tests: `uv run pytest tests/test_channels.py -k 'clone or derive or close or single_ or same_channel or repr or instantiate or queue_capacity_validation' -v`.

@@ -28,11 +28,11 @@ type-check:
 
 ## Run tests with pytest
 test:
-	uv run pytest -n auto
+	uv run pytest -n auto tests tools/review/*
 
 ## Run tests with coverage (pytest)
 test-coverage:
-	uv run pytest -n auto --cov=src --no-cov-on-fail --cov-report term-missing --cov-report html
+	uv run pytest -n auto --cov=src --no-cov-on-fail --cov-report term-missing --cov-report html tests tools/review/*
 
 ## Run pre-commit hooks on all files
 pre-commit:

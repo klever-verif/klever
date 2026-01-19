@@ -23,6 +23,14 @@ if TYPE_CHECKING:
 pytest_plugins = ("cocotb_tools.pytest.plugin",)
 
 
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Enable cocotb summary output when cocotb tests are present."""
+    if getattr(config.option, "cocotb_summary", False):
+        return
+    if any(item.get_closest_marker("cocotb_runner") for item in items):
+        config.option.cocotb_summary = True
+
+
 @pytest.fixture(name="dummy_top")
 def dummy_top_fixture(hdl: HDL) -> HDL:
     """Build minimal dummy HDL design for channel tests.

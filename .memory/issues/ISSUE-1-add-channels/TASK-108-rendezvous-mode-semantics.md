@@ -1,9 +1,12 @@
-# TASK-08-rendezvous-mode-semantics — Blocking rules, handshake completion, disconnect wakeups, concurrency
+---
+status: todo
+---
+
+# TASK-108-rendezvous-mode-semantics — Blocking rules, handshake completion, disconnect wakeups, concurrency
 
 ## Brief
 - Goal: Implement rendezvous-mode behavioral contracts from the acceptance matrix, including handshake correctness (send completes only after take) and disconnect safety.
 - Effort: 4–6h
-- Status: todo
 
 ## Details
 - Steps:
@@ -18,7 +21,7 @@
   - Implement acceptance-matrix rendezvous concurrency test (category "12"):
     - `test_rendezvous_concurrent_operations`
   - TDD loop: write failing tests first, then fix `_RendezvousChannel` in `src/klever/channel.py` to satisfy them.
-- Files: `TASK-03-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
+- Files: `TASK-103-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
 - Commands: `make test`, `pytest tests/test_channels.py -k 'rendezvous_' -v`
 - Risks / edge cases: Trigger/queue cleanup is critical; avoid leaked waiters and deadlocks.
 
@@ -32,4 +35,4 @@
 ## Notes
 
 ## Report
-- 
+-

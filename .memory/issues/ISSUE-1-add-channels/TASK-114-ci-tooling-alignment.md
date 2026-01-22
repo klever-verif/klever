@@ -1,9 +1,12 @@
-# TASK-14-ci-tooling-alignment — Make/CI wiring for cocotb tests
+---
+status: todo
+---
+
+# TASK-114-ci-tooling-alignment — Make/CI wiring for cocotb tests
 
 ## Brief
 - Goal: Ensure cocotb+Verilator tests run via a stable `make ...` command suitable for CI.
 - Effort: 2–4h
-- Status: todo
 
 ## Details
 - Steps:
@@ -27,4 +30,4 @@
 ## Notes
 
 ## Report
-- 
+-

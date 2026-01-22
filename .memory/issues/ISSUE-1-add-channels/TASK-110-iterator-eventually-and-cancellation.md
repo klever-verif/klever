@@ -1,9 +1,12 @@
-# TASK-10-iterator-eventually-and-cancellation — Iterator termination, eventually methods, cancellation robustness
+---
+status: todo
+---
+
+# TASK-110-iterator-eventually-and-cancellation — Iterator termination, eventually methods, cancellation robustness
 
 ## Brief
 - Goal: Enforce iterator termination, `*_eventually` semantics, and cancellation robustness per the acceptance matrix.
 - Effort: 4–6h
-- Status: todo
 
 ## Details
 - Steps:
@@ -22,7 +25,7 @@
     - `test_cancelled_receive_allows_subsequent_operations`
     - `test_cancelled_eventually_methods_cleanup`
   - Apply minimal fixes in `src/klever/channel.py` only if tests reveal busy loops, leaked waiters, or corrupted state after cancellation.
-- Files: `TASK-03-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
+- Files: `TASK-103-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
 - Commands: `make test`, `pytest tests/test_channels.py -k 'async_for or anext or eventually or cancelled' -v`
 - Risks / edge cases: Cancellation must not corrupt internal state; assertions should focus on "subsequent operations still work".
 
@@ -36,4 +39,4 @@
 ## Notes
 
 ## Report
-- 
+-

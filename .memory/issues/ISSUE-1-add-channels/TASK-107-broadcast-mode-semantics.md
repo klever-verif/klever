@@ -1,9 +1,12 @@
-# TASK-07-broadcast-mode-semantics — Broadcast delivery, dynamic receivers, disconnect wakeups
+---
+status: todo
+---
+
+# TASK-107-broadcast-mode-semantics — Broadcast delivery, dynamic receivers, disconnect wakeups
 
 ## Brief
 - Goal: Implement broadcast-mode behavioral contracts from the acceptance matrix (delivery to all receivers, dynamic receiver participation, and disconnect safety).
 - Effort: 4–6h
-- Status: todo
 
 ## Details
 - Steps:
@@ -15,7 +18,7 @@
     - `test_broadcast_blocked_sender_wakes_on_disconnect`
     - `test_broadcast_blocked_receiver_wakes_on_disconnect`
   - TDD loop: write failing tests first, then implement minimal fixes in broadcast internals to satisfy them (including wakeups/cleanup).
-- Files: `TASK-03-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
+- Files: `TASK-103-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
 - Commands: `make test`, `pytest tests/test_channels.py -k 'broadcast_' -v`
 - Risks / edge cases: Receiver sets can change during a send; keep behavior deterministic and exactly as asserted by tests.
 
@@ -29,4 +32,4 @@
 ## Notes
 
 ## Report
-- 
+-

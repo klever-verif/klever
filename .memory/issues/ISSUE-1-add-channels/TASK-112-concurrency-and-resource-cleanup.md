@@ -1,9 +1,12 @@
-# TASK-12-concurrency-and-resource-cleanup — Concurrent operations + internal cleanup checks
+---
+status: todo
+---
+
+# TASK-112-concurrency-and-resource-cleanup — Concurrent operations + internal cleanup checks
 
 ## Brief
 - Goal: Cover remaining concurrency/race and resource-cleanup requirements from the acceptance matrix.
 - Effort: 4–6h
-- Status: todo
 
 ## Details
 - Steps:
@@ -15,7 +18,7 @@
     - `test_broadcast_removes_queue_on_close`
     - `test_rendezvous_cleans_waiting_tasks`
   - Apply minimal fixes in `src/klever/channel.py` only if tests reveal leaked waiters/queues or inconsistent cleanup.
-- Files: `TASK-03-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
+- Files: `TASK-103-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
 - Commands: `make test`, `pytest tests/test_channels.py -k 'concurrent_ or cleanup or removes_' -v`
 - Risks / edge cases: Cleanup tests are implementation-coupled; keep internal inspection minimal and scoped.
 
@@ -29,4 +32,4 @@
 ## Notes
 
 ## Report
-- 
+-

@@ -1,3 +1,7 @@
+---
+status: done
+---
+
 ### Feature: Channels
 
 This feature introduces **channels** as the primary communication mechanism between transactors in the verification environment.

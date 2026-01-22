@@ -1,4 +1,8 @@
-# PLAN: 001-add-channels — Channels hardening
+---
+status: done
+---
+
+# PLAN: ISSUE-1-add-channels — Channels hardening
 
 ## Goal
 Harden channel correctness and usability while preserving the current public API shape in `src/klever/channel.py`.

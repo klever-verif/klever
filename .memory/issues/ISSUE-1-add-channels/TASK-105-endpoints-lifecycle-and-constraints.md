@@ -1,9 +1,12 @@
-# TASK-05-endpoints-lifecycle-and-constraints — Clone/derive/close + single producer/consumer + API edge cases
+---
+status: done
+---
+
+# TASK-105-endpoints-lifecycle-and-constraints — Clone/derive/close + single producer/consumer + API edge cases
 
 ## Brief
 - Goal: Lock down endpoint lifecycle and single-producer/consumer constraints via deterministic tests aligned with the acceptance matrix.
 - Effort: 3–4h
-- Status: done
 
 ## Details
 - Steps:
@@ -23,7 +26,7 @@
     - `test_endpoint_repr_closed`, `test_endpoint_repr_shows_channel`
     - `test_cannot_instantiate_sender_directly`, `test_cannot_instantiate_receiver_directly`
   - Apply minimal production fixes in `src/klever/channel.py` only when tests expose a contract mismatch.
-- Files: `TASK-03-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
+- Files: `TASK-103-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
 - Commands: `make test`, `pytest tests/test_channels.py -k 'clone or derive or close or single_ or same_channel or repr or instantiate' -v`
 - Risks / edge cases: Keep exception types consistent with the acceptance matrix (notably `ValueError` vs `ClosedError`).
 

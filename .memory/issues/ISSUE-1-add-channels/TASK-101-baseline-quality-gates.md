@@ -1,9 +1,12 @@
-# TASK-01-baseline-quality-gates — Baseline quality gates (lint/typecheck)
+---
+status: done
+---
+
+# TASK-101-baseline-quality-gates — Baseline quality gates (lint/typecheck)
 
 ## Brief
 - Goal: Establish baseline repo quality gates before changing channel behavior.
 - Effort: 2–3h
-- Status: done
 
 ## Details
 - Steps:
@@ -25,7 +28,7 @@
 
 ## Notes
 
-### NOTE-01
+### NOTE-1
 This task’s output is captured in `.memory/issues/001-add-channels/REVIEW-01.md`.
 
 ## Report

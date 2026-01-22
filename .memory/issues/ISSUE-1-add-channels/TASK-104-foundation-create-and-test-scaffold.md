@@ -1,9 +1,12 @@
-# TASK-04-foundation-create-and-test-scaffold — Test scaffold + create() & mode selection
+---
+status: done
+---
+
+# TASK-104-foundation-create-and-test-scaffold — Test scaffold + create() & mode selection
 
 ## Brief
 - Goal: Establish deterministic cocotb/pytest patterns in `tests/test_channels.py` and lock down `create()` mode selection contracts from the acceptance matrix.
 - Effort: 2–3h
-- Status: done
 
 ## Details
 - Steps:
@@ -16,7 +19,7 @@
     - `test_queue_capacity_validation` — verify ValueError on capacity < 1
   - Use public `mode` property (tx.mode, rx.mode) and Mode enum values (Mode.QUEUE, Mode.BROADCAST, Mode.RENDEZVOUS). Do NOT check private channel types.
   - No production code changes expected (validation and mode selection already implemented). If tests fail, investigate test implementation first.
-- Files: `TASK-03-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
+- Files: `TASK-103-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
 - Commands: `make test`, `pytest tests/test_channels.py -k 'create_ or queue_capacity_validation' -v`
 - Risks / edge cases: Overengineering helpers can increase flakiness; keep helpers small and reusable.
 

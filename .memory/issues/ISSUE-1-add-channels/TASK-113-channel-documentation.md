@@ -1,9 +1,12 @@
-# TASK-13-channel-documentation — Document tested behavior (post-green)
+---
+status: todo
+---
+
+# TASK-113-channel-documentation — Document tested behavior (post-green)
 
 ## Brief
 - Goal: Document channel behavior only after it is locked by passing acceptance-matrix tests.
 - Effort: 2–3h
-- Status: todo
 
 ## Details
 - Steps:
@@ -29,4 +32,4 @@
 ## Notes
 
 ## Report
-- 
+-

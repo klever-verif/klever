@@ -1,9 +1,12 @@
-# TASK-06-queue-mode-semantics — Queue send/receive, backpressure, disconnect wakeups, concurrency
+---
+status: done
+---
+
+# TASK-106-queue-mode-semantics — Queue send/receive, backpressure, disconnect wakeups, concurrency
 
 ## Brief
 - Goal: Implement queue-mode behavioral contracts from the acceptance matrix (send/receive semantics, blocking behavior, disconnect safety, and concurrency).
 - Effort: 4–6h
-- Status: done
 
 ## Details
 - Steps:
@@ -21,7 +24,7 @@
     - `test_queue_concurrent_sends`
     - `test_queue_concurrent_receives`
   - TDD loop: write failing tests first, then implement minimal fixes in queue internals (including wakeups/cleanup) to satisfy them.
-- Files: `TASK-03-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
+- Files: `TASK-103-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
 - Commands: `make test`, `pytest tests/test_channels.py -k 'queue_' -v`
 - Risks / edge cases: Avoid large timeouts; blocked/unblocked behavior should be proven deterministically.
 

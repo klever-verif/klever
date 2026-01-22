@@ -1,9 +1,12 @@
-# TASK-02-cocotb-smoke-harness — cocotb + Verilator smoke harness
+---
+status: done
+---
+
+# TASK-102-cocotb-smoke-harness — cocotb + Verilator smoke harness
 
 ## Brief
 - Goal: Add a minimal cocotb+Verilator pytest harness and a deterministic channel smoke test.
 - Effort: 3–4h
-- Status: done
 
 ## Details
 - Steps:

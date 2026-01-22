@@ -1,9 +1,12 @@
-# TASK-09-error-and-wait-contracts — Closed/Disconnected semantics + wait_for_* contracts
+---
+status: todo
+---
+
+# TASK-109-error-and-wait-contracts — Closed/Disconnected semantics + wait_for_* contracts
 
 ## Brief
 - Goal: Lock down exception semantics (`ClosedError`, `DisconnectedError`) and `wait_for_*` behavior across modes as per the acceptance matrix.
 - Effort: 3–5h
-- Status: todo
 
 ## Details
 - Steps:
@@ -23,7 +26,7 @@
     - `test_wait_for_receivers_immediate_if_exists`
     - `test_wait_for_senders_immediate_if_exists`
   - Apply minimal production fixes so waits are event-driven (no busy loops) and unblock on connect/disconnect deterministically.
-- Files: `TASK-03-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
+- Files: `TASK-103-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
 - Commands: `make test`, `pytest tests/test_channels.py -k 'wait_for_ or closed or disconnected' -v`
 - Risks / edge cases: Wait methods must not hang indefinitely; timeouts should only act as a bug detector.
 
@@ -37,4 +40,4 @@
 ## Notes
 
 ## Report
-- 
+-

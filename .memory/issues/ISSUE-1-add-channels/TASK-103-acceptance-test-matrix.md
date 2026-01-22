@@ -1,14 +1,17 @@
-# TASK-03-acceptance-test-matrix — Acceptance checklist and test matrix
+---
+status: done
+---
+
+# TASK-103-acceptance-test-matrix — Acceptance checklist and test matrix
 
 ## Brief
 - Goal: Define acceptance criteria for channels and map each requirement to one or more deterministic tests.
 - Effort: 2–3h
-- Status: done
 
 ## Details
 - Prerequisites:
   - Read `.memory/issues/001-add-channels/PLAN.md` to understand channel modes (queue/broadcast/rendezvous) and design decisions.
-  - Read `.memory/issues/001-add-channels/TASK-01-baseline-quality-gates.md` (status: done) to understand repo quality gates.
+  - Read `.memory/issues/001-add-channels/TASK-101-baseline-quality-gates.md` (status: done) to understand repo quality gates.
 - Steps:
   - Define an acceptance checklist covering:
     - Endpoint lifecycle (`close`, `clone`, `derive_*`, single-producer/consumer constraints).
@@ -30,8 +33,8 @@
 | Send after close raises ClosedError | all | Create channel, close sender, attempt send | example_send_after_close | tests/test_channels.py |
 | Async iterator stops when no senders | all | Receiver iterates while last sender closes | example_iterator_stops_on_disconnect | tests/test_channels.py |
   ```
-- Files: `.memory/issues/001-add-channels/PLAN.md`, `.memory/issues/001-add-channels/TASK-03-acceptance-test-matrix.md`, `tests/test_channels.py`, `src/klever/channel.py`
-- Commands: `make test` (after tests are implemented in TASK-04)
+- Files: `.memory/issues/001-add-channels/PLAN.md`, `tests/test_channels.py`, `src/klever/channel.py`
+- Commands: `make test` (after tests are implemented in TASK-104)
 - Risks / edge cases: Missing matrix coverage tends to produce "fixed but untested" regressions.
 
 ## Open Questions

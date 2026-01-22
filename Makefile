@@ -28,7 +28,7 @@ type-check:
 
 ## Run tests with pytest
 test:
-	uv run pytest -n auto tests .memory/issues/tools
+	uv run pytest -n auto tests .opencode/skill/issues-review-control/scripts
 
 ## Run tests with coverage (pytest)
 test-coverage:

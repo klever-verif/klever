@@ -10,6 +10,7 @@ import select
 import sqlite3
 import sys
 import time
+import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -19,25 +20,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-
-NAME_POOL = [
-    "john",
-    "dan",
-    "dave",
-    "mark",
-    "paul",
-    "luke",
-    "tom",
-    "alex",
-    "max",
-    "emma",
-    "lucy",
-    "kate",
-    "nina",
-    "rose",
-    "mike",
-    "zane",
-]
 
 EVENT_THREAD_CREATED = "thread_created"
 EVENT_COMMENT = "comment"
@@ -103,32 +85,66 @@ def log_event(home: Path, line: str) -> None:
         old_log.unlink(missing_ok=True)
 
 
+def table_exists(conn: sqlite3.Connection, table: str) -> bool:
+    """Return True when a table exists."""
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table,),
+    ).fetchone()
+    return row is not None
+
+
+def table_has_column(conn: sqlite3.Connection, table: str, column: str) -> bool:
+    """Return True when a table has a column."""
+    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    return any(row["name"] == column for row in rows)
+
+
+def migrate_legacy_schema(conn: sqlite3.Connection) -> None:
+    """Rename legacy tables from older schemas."""
+    if not table_exists(conn, "reviews"):
+        return
+    if table_has_column(conn, "reviews", "scope"):
+        return
+    suffix = datetime.now(tz=UTC).strftime("%Y%m%d%H%M%S")
+    for table in ["events", "comments", "threads", "participants", "reviews"]:
+        if table_exists(conn, table):
+            conn.execute(f"ALTER TABLE {table} RENAME TO {table}_legacy_{suffix}")
+    for index in [
+        "reviews_issue_open_idx",
+        "participants_review_idx",
+        "threads_review_idx",
+        "comments_thread_idx",
+        "events_review_idx",
+    ]:
+        conn.execute(f"DROP INDEX IF EXISTS {index}")
+
+
 def init_db(conn: sqlite3.Connection) -> None:
     """Create tables if they do not exist."""
+    migrate_legacy_schema(conn)
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS reviews (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            issue INTEGER NOT NULL,
-            task INTEGER NOT NULL,
+            id TEXT PRIMARY KEY,
+            scope TEXT NOT NULL,
             status TEXT NOT NULL CHECK(status IN ('open', 'closed')),
             created_at TEXT NOT NULL,
-            closed_at TEXT,
-            UNIQUE(issue, task)
+            closed_at TEXT
         )
         """
     )
-    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS reviews_issue_open_idx ON reviews(issue) WHERE status='open'")
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS participants (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            review_id INTEGER NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+            review_id TEXT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
             token TEXT NOT NULL UNIQUE,
             name TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('reviewer', 'reviewee')),
             last_event_id INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            UNIQUE(review_id, name)
         )
         """
     )
@@ -137,7 +153,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS threads (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            review_id INTEGER NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+            review_id TEXT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
             thread_no INTEGER NOT NULL,
             status TEXT NOT NULL CHECK(status IN ('open', 'resolved')),
             author_token TEXT NOT NULL,
@@ -164,7 +180,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            review_id INTEGER NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+            review_id TEXT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
             event_type TEXT NOT NULL,
             thread_no INTEGER,
             author_token TEXT,
@@ -196,12 +212,7 @@ def validate_non_negative(value: int, label: str) -> None:
         raise ReviewError(f"{label} must be a non-negative integer")
 
 
-def fetch_review(conn: sqlite3.Connection, issue: int, task: int) -> sqlite3.Row | None:
-    """Fetch a review by issue/task."""
-    return conn.execute("SELECT * FROM reviews WHERE issue = ? AND task = ?", (issue, task)).fetchone()
-
-
-def fetch_review_by_id(conn: sqlite3.Connection, review_id: int) -> sqlite3.Row | None:
+def fetch_review(conn: sqlite3.Connection, review_id: str) -> sqlite3.Row | None:
     """Fetch a review by ID."""
     return conn.execute("SELECT * FROM reviews WHERE id = ?", (review_id,)).fetchone()
 
@@ -214,31 +225,28 @@ def fetch_participant(conn: sqlite3.Connection, token: str) -> sqlite3.Row | Non
 def resolve_review_from_args(
     conn: sqlite3.Connection,
     token: str | None,
-    issue: int | None,
-    task: int | None,
+    review_id: str | None,
 ) -> sqlite3.Row:
-    """Resolve a review based on token or issue/task."""
-    if token and (issue is not None or task is not None):
-        raise ReviewError("use either --token or --issue/--task")
-    if token is None and (issue is None or task is None):
-        raise ReviewError("--issue and --task are required when --token is not used")
+    """Resolve a review based on token or ID."""
+    if token and review_id is not None:
+        raise ReviewError("use either --token or --id")
+    if token is None and review_id is None:
+        raise ReviewError("--id is required when --token is not used")
     if token:
         participant = fetch_participant(conn, token)
         if not participant:
             raise ReviewError("invalid token")
-        review = fetch_review_by_id(conn, participant["review_id"])
+        review = fetch_review(conn, participant["review_id"])
     else:
-        if issue is None or task is None:
-            raise ReviewError("--issue and --task are required when --token is not used")
-        validate_non_negative(issue, "issue")
-        validate_non_negative(task, "task")
-        review = fetch_review(conn, issue, task)
+        if review_id is None:
+            raise ReviewError("--id is required when --token is not used")
+        review = fetch_review(conn, review_id)
     if not review:
         raise ReviewError("review does not exist")
     return review
 
 
-def fetch_thread(conn: sqlite3.Connection, review_id: int, thread_no: int) -> sqlite3.Row | None:
+def fetch_thread(conn: sqlite3.Connection, review_id: str, thread_no: int) -> sqlite3.Row | None:
     """Fetch a thread by review and thread number."""
     return conn.execute(
         "SELECT * FROM threads WHERE review_id = ? AND thread_no = ?",
@@ -246,13 +254,13 @@ def fetch_thread(conn: sqlite3.Connection, review_id: int, thread_no: int) -> sq
     ).fetchone()
 
 
-def count_threads(conn: sqlite3.Connection, review_id: int) -> int:
+def count_threads(conn: sqlite3.Connection, review_id: str) -> int:
     """Count threads for a review."""
     row = conn.execute("SELECT COUNT(*) AS count FROM threads WHERE review_id = ?", (review_id,)).fetchone()
     return int(row["count"])
 
 
-def count_threads_by_status(conn: sqlite3.Connection, review_id: int, status: str) -> int:
+def count_threads_by_status(conn: sqlite3.Connection, review_id: str, status: str) -> int:
     """Count threads for a review by status."""
     row = conn.execute(
         "SELECT COUNT(*) AS count FROM threads WHERE review_id = ? AND status = ?",
@@ -261,7 +269,7 @@ def count_threads_by_status(conn: sqlite3.Connection, review_id: int, status: st
     return int(row["count"])
 
 
-def list_thread_numbers(conn: sqlite3.Connection, review_id: int, status: str | None = None) -> list[int]:
+def list_thread_numbers(conn: sqlite3.Connection, review_id: str, status: str | None = None) -> list[int]:
     """Return thread numbers for a review."""
     if status:
         rows = conn.execute(
@@ -276,7 +284,7 @@ def list_thread_numbers(conn: sqlite3.Connection, review_id: int, status: str | 
     return [int(row["thread_no"]) for row in rows]
 
 
-def count_participants(conn: sqlite3.Connection, review_id: int, role: str | None = None) -> int:
+def count_participants(conn: sqlite3.Connection, review_id: str, role: str | None = None) -> int:
     """Count participants for a review."""
     if role:
         row = conn.execute(
@@ -294,7 +302,7 @@ def count_comments_for_thread(conn: sqlite3.Connection, thread_id: int) -> int:
     return int(row["count"])
 
 
-def count_comments_for_review(conn: sqlite3.Connection, review_id: int) -> int:
+def count_comments_for_review(conn: sqlite3.Connection, review_id: str) -> int:
     """Count comments for a review."""
     row = conn.execute(
         """
@@ -321,7 +329,7 @@ class EventPayload:
 
 def add_event(
     conn: sqlite3.Connection,
-    review_id: int,
+    review_id: str,
     payload: EventPayload,
 ) -> None:
     """Insert an event for the review."""
@@ -349,21 +357,6 @@ def add_event(
     log_event(get_home_dir(), format_event(conn, event_row))
 
 
-def select_available_name(conn: sqlite3.Connection, review_id: int, pid: int) -> str | None:
-    """Return the next available name for a review."""
-    rows = conn.execute("SELECT name FROM participants WHERE review_id = ?", (review_id,)).fetchall()
-    used = {row["name"] for row in rows}
-    for name in NAME_POOL:
-        if name in used:
-            continue
-        token = f"{name}-{pid}"
-        exists = conn.execute("SELECT 1 FROM participants WHERE token = ?", (token,)).fetchone()
-        if exists:
-            continue
-        return name
-    return None
-
-
 def read_stdin_text() -> str | None:
     """Return text from stdin if available."""
     if sys.stdin is None or sys.stdin.closed:
@@ -384,29 +377,30 @@ def read_stdin_text() -> str | None:
     return content.strip() if content else None
 
 
-def ensure_review(conn: sqlite3.Connection, issue: int, task: int, allow_create: bool) -> sqlite3.Row:
-    """Get or create a review based on flags."""
-    review = fetch_review(conn, issue, task)
-    if review:
-        if review["status"] == "closed":
-            raise ReviewError("review is already closed for this issue/task")
-        return review
-    if not allow_create:
-        raise ReviewError("review does not exist")
-    open_review = conn.execute("SELECT task FROM reviews WHERE issue = ? AND status = 'open'", (issue,)).fetchone()
-    if open_review:
-        raise ReviewError(f"issue {issue} already has an active review for task {open_review['task']}")
-    cursor = conn.execute(
-        "INSERT INTO reviews(issue, task, status, created_at) VALUES (?, ?, 'open', ?)",
-        (issue, task, now_timestamp()),
-    )
-    review_id = cursor.lastrowid
-    if review_id is None:
-        raise ReviewError("failed to create review")
-    review = fetch_review_by_id(conn, review_id)
-    if review is None:
-        raise ReviewError("failed to load review")
-    return review
+def parse_scope(parts: list[str]) -> str:
+    """Return the scope text from args or stdin."""
+    text = " ".join(parts).strip()
+    if not text:
+        stdin_text = read_stdin_text()
+        if stdin_text:
+            text = stdin_text
+    if not text:
+        raise ReviewError("scope text is required")
+    return text
+
+
+def scope_header(scope: str) -> str:
+    """Return the first line of the scope."""
+    lines = scope.splitlines()
+    return lines[0] if lines else ""
+
+
+def generate_review_id(conn: sqlite3.Connection) -> str:
+    """Return a unique review ID."""
+    while True:
+        review_id = uuid.uuid4().hex[:8]
+        if not fetch_review(conn, review_id):
+            return review_id
 
 
 def format_event(conn: sqlite3.Connection, event: sqlite3.Row) -> str:
@@ -429,7 +423,7 @@ def format_event(conn: sqlite3.Connection, event: sqlite3.Row) -> str:
     return line
 
 
-def maybe_add_all_threads_resolved(conn: sqlite3.Connection, review_id: int, author_token: str) -> None:
+def maybe_add_all_threads_resolved(conn: sqlite3.Connection, review_id: str, author_token: str) -> None:
     """Record an all-threads-resolved event when appropriate."""
     open_threads = count_threads_by_status(conn, review_id, "open")
     total_threads = count_threads(conn, review_id)
@@ -460,47 +454,45 @@ def parse_comment(parts: list[str], required: bool) -> str | None:
 
 def cmd_create(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     """Create a review if allowed."""
-    validate_non_negative(args.issue, "issue")
-    validate_non_negative(args.task, "task")
+    scope = parse_scope(args.scope)
     with write_transaction(conn):
-        review = fetch_review(conn, args.issue, args.task)
-        if review:
-            if review["status"] == "closed":
-                raise ReviewError("review is already closed for this issue/task")
-        else:
-            open_review = conn.execute(
-                "SELECT task FROM reviews WHERE issue = ? AND status = 'open'", (args.issue,)
-            ).fetchone()
-            if open_review:
-                raise ReviewError(f"issue {args.issue} already has an active review for task {open_review['task']}")
-            conn.execute(
-                "INSERT INTO reviews(issue, task, status, created_at) VALUES (?, ?, 'open', ?)",
-                (args.issue, args.task, now_timestamp()),
-            )
-    sys.stdout.write(f"review: issue={args.issue} task={args.task} status=open\n")
+        review_id = generate_review_id(conn)
+        conn.execute(
+            "INSERT INTO reviews(id, scope, status, created_at) VALUES (?, ?, 'open', ?)",
+            (review_id, scope, now_timestamp()),
+        )
+    sys.stdout.write(f"{review_id}\n")
 
 
 def cmd_join(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     """Join a review and allocate a token."""
-    validate_non_negative(args.issue, "issue")
-    validate_non_negative(args.task, "task")
-    pid = os.getpid()
+    review_id = args.review_id
+    name = args.name.strip()
+    if not name:
+        raise ReviewError("name is required")
     with write_transaction(conn):
-        review = ensure_review(conn, args.issue, args.task, args.create)
-        name = select_available_name(conn, review["id"], pid)
-        if not name:
-            raise ReviewError("name pool exhausted for this review")
-        token = f"{name}-{pid}"
+        review = fetch_review(conn, review_id)
+        if not review:
+            raise ReviewError("review does not exist")
+        if review["status"] == "closed":
+            raise ReviewError("review is closed")
+        existing = conn.execute(
+            "SELECT 1 FROM participants WHERE review_id = ? AND name = ?",
+            (review_id, name),
+        ).fetchone()
+        if existing:
+            raise ReviewError("name is already taken")
+        token = f"{name}-{review_id}"
         max_event = conn.execute(
             "SELECT COALESCE(MAX(id), 0) AS max_id FROM events WHERE review_id = ?",
-            (review["id"],),
+            (review_id,),
         ).fetchone()
         conn.execute(
             """
             INSERT INTO participants(review_id, token, name, role, last_event_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (review["id"], token, name, args.role, int(max_event["max_id"]), now_timestamp()),
+            (review_id, token, name, args.role, int(max_event["max_id"]), now_timestamp()),
         )
     sys.stdout.write(f"{token}\n")
 
@@ -511,7 +503,7 @@ def cmd_threads_create(conn: sqlite3.Connection, args: argparse.Namespace) -> No
         participant = fetch_participant(conn, args.token)
         if not participant:
             raise ReviewError("invalid token")
-        review = fetch_review_by_id(conn, participant["review_id"])
+        review = fetch_review(conn, participant["review_id"])
         if review is None or review["status"] == "closed":
             raise ReviewError("review is closed")
         if participant["role"] != "reviewer":
@@ -553,7 +545,7 @@ def cmd_threads_comment(conn: sqlite3.Connection, args: argparse.Namespace) -> N
         participant = fetch_participant(conn, args.token)
         if not participant:
             raise ReviewError("invalid token")
-        review = fetch_review_by_id(conn, participant["review_id"])
+        review = fetch_review(conn, participant["review_id"])
         if review is None or review["status"] == "closed":
             raise ReviewError("review is closed")
         thread = fetch_thread(conn, review["id"], args.thread)
@@ -609,7 +601,7 @@ def cmd_threads_resolve(conn: sqlite3.Connection, args: argparse.Namespace) -> N
         participant = fetch_participant(conn, args.token)
         if not participant:
             raise ReviewError("invalid token")
-        review = fetch_review_by_id(conn, participant["review_id"])
+        review = fetch_review(conn, participant["review_id"])
         if review is None or review["status"] == "closed":
             raise ReviewError("review is closed")
         thread = fetch_thread(conn, review["id"], args.thread)
@@ -647,7 +639,7 @@ def cmd_close(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
             raise ReviewError("invalid token")
         if participant["role"] != "reviewer":
             raise ReviewError("token cannot close the review")
-        review = fetch_review_by_id(conn, participant["review_id"])
+        review = fetch_review(conn, participant["review_id"])
         if review is None or review["status"] == "closed":
             raise ReviewError("review is closed")
         open_threads = list_thread_numbers(conn, review["id"], status="open")
@@ -678,7 +670,7 @@ def cmd_close(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     sys.stdout.write(
         "\n".join(
             [
-                f"review: issue={review['issue']} task={review['task']} status=closed",
+                f"review: id={review['id']} status=closed",
                 (f"threads: {threads_count} comments: {comments_count} reviewers: {reviewers} reviewees: {reviewees}"),
             ]
         )
@@ -688,9 +680,7 @@ def cmd_close(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
 
 def cmd_status(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     """Show review status and counts."""
-    validate_non_negative(args.issue, "issue")
-    validate_non_negative(args.task, "task")
-    review = fetch_review(conn, args.issue, args.task)
+    review = fetch_review(conn, args.review_id)
     if not review:
         raise ReviewError("review does not exist")
     open_threads = count_threads_by_status(conn, review["id"], "open")
@@ -701,7 +691,7 @@ def cmd_status(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     sys.stdout.write(
         "\n".join(
             [
-                f"review: issue={review['issue']} task={review['task']} status={review['status']}",
+                f"review: id={review['id']} status={review['status']}",
                 f"threads: open={open_threads} resolved={resolved_threads} comments={comments_count}",
                 f"participants: reviewers={reviewers} reviewees={reviewees}",
             ]
@@ -738,8 +728,9 @@ def cmd_view(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     thread_no = getattr(args, "thread", None)
     if thread_no is not None:
         validate_non_negative(thread_no, "thread")
-    review = resolve_review_from_args(conn, args.token, args.issue, args.task)
-    lines = [f"# issue-{review['issue']}: task-{review['task']} {review['status']}"]
+    review = resolve_review_from_args(conn, args.token, args.review_id)
+    lines = [f"# review-{review['id']} {review['status']}"]
+    lines.extend(review["scope"].splitlines())
     if thread_no is not None:
         thread = fetch_thread(conn, review["id"], thread_no)
         if not thread:
@@ -757,28 +748,23 @@ def cmd_view(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
 
 def cmd_list(conn: sqlite3.Connection, _args: argparse.Namespace) -> None:
     """List active reviews."""
-    reviews = conn.execute(
-        "SELECT id, issue, task FROM reviews WHERE status = 'open' ORDER BY issue ASC, task ASC"
-    ).fetchall()
+    reviews = conn.execute("SELECT id, scope FROM reviews WHERE status = 'open' ORDER BY created_at ASC").fetchall()
     if not reviews:
         eprint("no active reviews")
         return
     for review in reviews:
-        threads_count = count_threads(conn, review["id"])
-        participants_count = count_participants(conn, review["id"])
+        header = scope_header(review["scope"].strip())
         sys.stdout.write(
-            "review: issue={issue} task={task} threads={threads} participants={participants}\n".format(
-                issue=review["issue"],
-                task=review["task"],
-                threads=threads_count,
-                participants=participants_count,
+            "review: id={review_id} scope={header}\n".format(
+                review_id=review["id"],
+                header=header or "-",
             )
         )
 
 
 def cmd_threads_list(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     """List threads for a review."""
-    review = resolve_review_from_args(conn, args.token, args.issue, args.task)
+    review = resolve_review_from_args(conn, args.token, args.review_id)
     threads = conn.execute(
         "SELECT * FROM threads WHERE review_id = ? ORDER BY thread_no ASC",
         (review["id"],),
@@ -803,11 +789,12 @@ def cmd_threads_list(conn: sqlite3.Connection, args: argparse.Namespace) -> None
 def cmd_threads_view(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     """View a single thread."""
     validate_non_negative(args.thread, "thread")
-    review = resolve_review_from_args(conn, args.token, args.issue, args.task)
+    review = resolve_review_from_args(conn, args.token, args.review_id)
     thread = fetch_thread(conn, review["id"], args.thread)
     if not thread:
         raise ReviewError("thread does not exist")
-    lines = [f"# issue-{review['issue']}: task-{review['task']} {review['status']}"]
+    lines = [f"# review-{review['id']} {review['status']}"]
+    lines.extend(review["scope"].splitlines())
     lines.extend(render_thread(conn, thread))
     sys.stdout.write("\n".join(lines).rstrip("\n") + "\n")
 
@@ -817,7 +804,7 @@ def cmd_wait(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     participant = fetch_participant(conn, args.token)
     if not participant:
         raise ReviewError("invalid token")
-    review = fetch_review_by_id(conn, participant["review_id"])
+    review = fetch_review(conn, participant["review_id"])
     if review is None or review["status"] == "closed":
         raise ReviewError("review is closed")
     while True:
@@ -841,7 +828,7 @@ def cmd_wait(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
             for event in events:
                 sys.stdout.write(f"{format_event(conn, event)}\n")
             return
-        review = fetch_review_by_id(conn, participant["review_id"])
+        review = fetch_review(conn, participant["review_id"])
         if review is None or review["status"] == "closed":
             raise ReviewError("review is closed")
         time.sleep(0.5)
@@ -850,18 +837,16 @@ def cmd_wait(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
 def add_create_parser(subparsers: Any) -> None:
     """Register the create command."""
     create_parser = subparsers.add_parser("create", help="Create a review")
-    create_parser.add_argument("--issue", type=int, required=True)
-    create_parser.add_argument("--task", type=int, required=True)
+    create_parser.add_argument("scope", nargs=argparse.REMAINDER)
     create_parser.set_defaults(func=cmd_create)
 
 
 def add_join_parser(subparsers: Any) -> None:
     """Register the join command."""
     join_parser = subparsers.add_parser("join", help="Join a review")
-    join_parser.add_argument("--issue", type=int, required=True)
-    join_parser.add_argument("--task", type=int, required=True)
+    join_parser.add_argument("review_id")
+    join_parser.add_argument("--name", required=True)
     join_parser.add_argument("--role", choices=["reviewer", "reviewee"], required=True)
-    join_parser.add_argument("--create", action="store_true")
     join_parser.set_defaults(func=cmd_join)
 
 
@@ -875,8 +860,7 @@ def add_close_parser(subparsers: Any) -> None:
 def add_status_parser(subparsers: Any) -> None:
     """Register the status command."""
     status_parser = subparsers.add_parser("status", help="Show review status")
-    status_parser.add_argument("--issue", type=int, required=True)
-    status_parser.add_argument("--task", type=int, required=True)
+    status_parser.add_argument("--id", dest="review_id", required=True)
     status_parser.set_defaults(func=cmd_status)
 
 
@@ -884,8 +868,7 @@ def add_view_parser(subparsers: Any) -> None:
     """Register the view command."""
     view_parser = subparsers.add_parser("view", help="View review contents")
     view_parser.add_argument("--token")
-    view_parser.add_argument("--issue", type=int)
-    view_parser.add_argument("--task", type=int)
+    view_parser.add_argument("--id", dest="review_id")
     view_parser.set_defaults(func=cmd_view)
 
 
@@ -918,14 +901,12 @@ def add_threads_parsers(subparsers: Any) -> None:
 
     threads_list = threads_subparsers.add_parser("list", help="List threads")
     threads_list.add_argument("--token")
-    threads_list.add_argument("--issue", type=int)
-    threads_list.add_argument("--task", type=int)
+    threads_list.add_argument("--id", dest="review_id")
     threads_list.set_defaults(func=cmd_threads_list)
 
     threads_view = threads_subparsers.add_parser("view", help="View a thread")
     threads_view.add_argument("--token")
-    threads_view.add_argument("--issue", type=int)
-    threads_view.add_argument("--task", type=int)
+    threads_view.add_argument("--id", dest="review_id")
     threads_view.add_argument("-n", "--thread", type=int, required=True)
     threads_view.set_defaults(func=cmd_threads_view)
 

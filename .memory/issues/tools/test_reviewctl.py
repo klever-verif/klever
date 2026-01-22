@@ -12,19 +12,19 @@ from pathlib import Path
 
 import pytest
 
-REVIEW_PATH = Path(__file__).resolve().parent / "review.py"
-REVIEW_SPEC = util.spec_from_file_location("review", REVIEW_PATH)
+REVIEW_PATH = Path(__file__).resolve().parent / "reviewctl.py"
+REVIEW_SPEC = util.spec_from_file_location("reviewctl", REVIEW_PATH)
 if REVIEW_SPEC is None or REVIEW_SPEC.loader is None:
     raise RuntimeError("Unable to load review module")
-review = util.module_from_spec(REVIEW_SPEC)
-sys.modules["review"] = review
-REVIEW_SPEC.loader.exec_module(review)
+reviewctl = util.module_from_spec(REVIEW_SPEC)
+sys.modules["reviewctl"] = reviewctl
+REVIEW_SPEC.loader.exec_module(reviewctl)
 
 
 @pytest.fixture
 def review_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Provide a temporary review home directory."""
-    monkeypatch.setenv(review.REVIEWCTL_HOME_ENV, str(tmp_path))
+    monkeypatch.setenv(reviewctl.REVIEWCTL_HOME_ENV, str(tmp_path))
     return tmp_path
 
 
@@ -33,7 +33,7 @@ def run_command(argv: list[str]) -> tuple[int, str, str]:
     stdout = StringIO()
     stderr = StringIO()
     with redirect_stdout(stdout), redirect_stderr(stderr):
-        code = review.main(argv)
+        code = reviewctl.main(argv)
     return code, stdout.getvalue().rstrip("\n"), stderr.getvalue().rstrip("\n")
 
 
@@ -48,10 +48,7 @@ def test_create_and_join_flow(review_home: Path) -> None:
     assert code == 0
     assert stderr == ""
     lines = stdout.splitlines()
-    assert lines[0].startswith("token: ")
-    assert lines[1] == "threads: 0"
-    assert lines[2] == "reviewers: 1"
-    assert lines[3] == "reviewees: 0"
+    assert len(lines) == 1
 
 
 def test_create_same_issue_requires_single_task(review_home: Path) -> None:
@@ -63,10 +60,10 @@ def test_create_same_issue_requires_single_task(review_home: Path) -> None:
 
 
 def test_create_rejects_closed_review(review_home: Path) -> None:
-    """Reject creating a closed review."""
+    """Reject creating a closed reviewctl."""
     run_command(["create", "--issue", "3", "--task", "0"])
     code, stdout, _stderr = run_command(["join", "--issue", "3", "--task", "0", "--role", "reviewer"])
-    token = stdout.splitlines()[0].split(" ", 1)[1]
+    token = stdout.splitlines()[0]
     run_command(["close", "--token", token])
     code, _stdout, stderr = run_command(["create", "--issue", "3", "--task", "0"])
     assert code == 1
@@ -85,14 +82,14 @@ def test_join_can_create_review(review_home: Path) -> None:
     code, stdout, stderr = run_command(["join", "--issue", "6", "--task", "0", "--role", "reviewee", "--create"])
     assert code == 0
     assert stderr == ""
-    assert stdout.splitlines()[0].startswith("token: ")
+    assert stdout
 
 
 def test_join_closed_review_errors(review_home: Path) -> None:
     """Reject joining closed reviews."""
     run_command(["create", "--issue", "7", "--task", "0"])
     code, stdout, _stderr = run_command(["join", "--issue", "7", "--task", "0", "--role", "reviewer"])
-    token = stdout.splitlines()[0].split(" ", 1)[1]
+    token = stdout.splitlines()[0]
     run_command(["close", "--token", token])
     code, _stdout, stderr = run_command(["join", "--issue", "7", "--task", "0", "--role", "reviewee"])
     assert code == 1
@@ -102,7 +99,7 @@ def test_join_closed_review_errors(review_home: Path) -> None:
 def test_join_name_pool_exhausted(review_home: Path) -> None:
     """Reject joins when name pool is exhausted."""
     run_command(["create", "--issue", "8", "--task", "0"])
-    for _ in range(len(review.NAME_POOL)):
+    for _ in range(len(reviewctl.NAME_POOL)):
         code, _stdout, _stderr = run_command(["join", "--issue", "8", "--task", "0", "--role", "reviewer"])
         assert code == 0
     code, _stdout, stderr = run_command(["join", "--issue", "8", "--task", "0", "--role", "reviewee"])
@@ -111,21 +108,22 @@ def test_join_name_pool_exhausted(review_home: Path) -> None:
 
 
 def test_comment_create_thread_by_reviewer(review_home: Path) -> None:
-    """Allow reviewers to create threads via comments."""
+    """Allow reviewers to create threads."""
     run_command(["create", "--issue", "10", "--task", "0"])
     code, stdout, _stderr = run_command(["join", "--issue", "10", "--task", "0", "--role", "reviewer"])
-    token = stdout.splitlines()[0].split(" ", 1)[1]
-    code, stdout, _stderr = run_command(["comment", "--token", token, "First comment"])
+    token = stdout.splitlines()[0]
+    run_command(["threads", "create", "--token", token])
+    code, stdout, _stderr = run_command(["threads", "comment", "--token", token, "-n", "0", "First comment"])
     assert code == 0
-    assert stdout == "comments: 1"
+    assert stdout == "thread: 0 comments: 1"
 
 
 def test_comment_rejects_reviewee_thread_creation(review_home: Path) -> None:
     """Reject reviewee thread creation."""
     run_command(["create", "--issue", "11", "--task", "0"])
     code, stdout, _stderr = run_command(["join", "--issue", "11", "--task", "0", "--role", "reviewee"])
-    token = stdout.splitlines()[0].split(" ", 1)[1]
-    code, _stdout, stderr = run_command(["comment", "--token", token, "Need a thread"])
+    token = stdout.splitlines()[0]
+    code, _stdout, stderr = run_command(["threads", "create", "--token", token])
     assert code == 1
     assert "reviewee cannot create" in stderr
 
@@ -134,8 +132,8 @@ def test_comment_nonexistent_thread_errors(review_home: Path) -> None:
     """Reject comments to non-existent threads."""
     run_command(["create", "--issue", "12", "--task", "0"])
     code, stdout, _stderr = run_command(["join", "--issue", "12", "--task", "0", "--role", "reviewer"])
-    token = stdout.splitlines()[0].split(" ", 1)[1]
-    code, _stdout, stderr = run_command(["comment", "--token", token, "--thread", "2", "Missing"])
+    token = stdout.splitlines()[0]
+    code, _stdout, stderr = run_command(["threads", "comment", "--token", token, "-n", "2", "Missing"])
     assert code == 1
     assert "thread does not exist" in stderr
 
@@ -144,32 +142,44 @@ def test_comment_resolved_thread_errors(review_home: Path) -> None:
     """Reject comments on resolved threads."""
     run_command(["create", "--issue", "13", "--task", "0"])
     code, stdout, _stderr = run_command(["join", "--issue", "13", "--task", "0", "--role", "reviewer"])
-    token = stdout.splitlines()[0].split(" ", 1)[1]
-    run_command(["comment", "--token", token, "Thread open"])
-    run_command(["resolve", "--token", token, "--thread", "0"])
-    code, _stdout, stderr = run_command(["comment", "--token", token, "--thread", "0", "Nope"])
+    token = stdout.splitlines()[0]
+    run_command(["threads", "create", "--token", token])
+    run_command(["threads", "comment", "--token", token, "-n", "0", "Thread open"])
+    run_command(["threads", "resolve", "--token", token, "-n", "0"])
+    code, _stdout, stderr = run_command(["threads", "comment", "--token", token, "-n", "0", "Nope"])
     assert code == 1
     assert "thread is resolved" in stderr
 
 
 def test_comment_invalid_token_errors(review_home: Path) -> None:
     """Reject comments with invalid tokens."""
-    code, _stdout, stderr = run_command(["comment", "--token", "nope", "Hello"])
+    code, _stdout, stderr = run_command(["threads", "comment", "--token", "nope", "-n", "0", "Hello"])
     assert code == 1
     assert "invalid token" in stderr
+
+
+def test_all_threads_resolved_event(review_home: Path) -> None:
+    """Emit an all threads resolved event when closing threads."""
+    run_command(["create", "--issue", "50", "--task", "0"])
+    reviewer = run_command(["join", "--issue", "50", "--task", "0", "--role", "reviewer"])[1]
+    reviewee = run_command(["join", "--issue", "50", "--task", "0", "--role", "reviewee"])[1]
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Note"])
+    run_command(["threads", "resolve", "--token", reviewer, "-n", "0"])
+    code, stdout, _stderr = run_command(["wait", "--token", reviewee])
+    assert code == 0
+    assert any("event: all_threads_resolved" in line for line in stdout.splitlines())
 
 
 def test_resolve_requires_author(review_home: Path) -> None:
     """Only thread authors can resolve threads."""
     run_command(["create", "--issue", "14", "--task", "0"])
-    reviewer_token = (
-        run_command(["join", "--issue", "14", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    reviewee_token = (
-        run_command(["join", "--issue", "14", "--task", "0", "--role", "reviewee"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    run_command(["comment", "--token", reviewer_token, "Open thread"])
-    code, _stdout, stderr = run_command(["resolve", "--token", reviewee_token, "--thread", "0"])
+    reviewer_token = run_command(["join", "--issue", "14", "--task", "0", "--role", "reviewer"])[1]
+    reviewee_token = run_command(["join", "--issue", "14", "--task", "0", "--role", "reviewee"])[1]
+    run_command(["threads", "create", "--token", reviewer_token])
+    run_command(["threads", "comment", "--token", reviewer_token, "-n", "0", "Open thread"])
+    code, _stdout, stderr = run_command(["threads", "resolve", "--token", reviewee_token, "-n", "0"])
+
     assert code == 1
     assert "cannot resolve" in stderr
 
@@ -177,33 +187,29 @@ def test_resolve_requires_author(review_home: Path) -> None:
 def test_resolve_missing_thread_errors(review_home: Path) -> None:
     """Reject resolves for missing threads."""
     run_command(["create", "--issue", "15", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "15", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    code, _stdout, stderr = run_command(["resolve", "--token", token, "--thread", "1"])
+    token = run_command(["join", "--issue", "15", "--task", "0", "--role", "reviewer"])[1]
+    code, _stdout, stderr = run_command(["threads", "resolve", "--token", token, "-n", "1"])
     assert code == 1
     assert "thread does not exist" in stderr
 
 
 def test_resolve_accepts_optional_comment(review_home: Path) -> None:
-    """Allow resolves with optional comment."""
+    """Allow resolving threads with a comment."""
     run_command(["create", "--issue", "16", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "16", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    run_command(["comment", "--token", token, "Open thread"])
-    code, stdout, _stderr = run_command(["resolve", "--token", token, "--thread", "0", "Final note"])
+    token = run_command(["join", "--issue", "16", "--task", "0", "--role", "reviewer"])[1]
+    run_command(["threads", "create", "--token", token])
+    run_command(["threads", "comment", "--token", token, "-n", "0", "Open thread"])
+    code, stdout, _stderr = run_command(["threads", "comment", "--token", token, "-n", "0", "--resolve", "Final note"])
     assert code == 0
-    assert stdout == "comments: 2"
+    assert stdout == "thread: 0 comments: 2"
 
 
 def test_close_requires_resolved_threads(review_home: Path) -> None:
     """Reject closing when threads remain open."""
     run_command(["create", "--issue", "17", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "17", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    run_command(["comment", "--token", token, "Open thread"])
+    token = run_command(["join", "--issue", "17", "--task", "0", "--role", "reviewer"])[1]
+    run_command(["threads", "create", "--token", token])
+    run_command(["threads", "comment", "--token", token, "-n", "0", "Open thread"])
     code, _stdout, stderr = run_command(["close", "--token", token])
     assert code == 1
     assert "all threads must be resolved" in stderr
@@ -212,14 +218,11 @@ def test_close_requires_resolved_threads(review_home: Path) -> None:
 def test_close_requires_reviewer(review_home: Path) -> None:
     """Allow only reviewers to close reviews."""
     run_command(["create", "--issue", "18", "--task", "0"])
-    reviewer = (
-        run_command(["join", "--issue", "18", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    reviewee = (
-        run_command(["join", "--issue", "18", "--task", "0", "--role", "reviewee"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    run_command(["comment", "--token", reviewer, "Open thread"])
-    run_command(["resolve", "--token", reviewer, "--thread", "0"])
+    reviewer = run_command(["join", "--issue", "18", "--task", "0", "--role", "reviewer"])[1]
+    reviewee = run_command(["join", "--issue", "18", "--task", "0", "--role", "reviewee"])[1]
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Open thread"])
+    run_command(["threads", "resolve", "--token", reviewer, "-n", "0"])
     code, _stdout, stderr = run_command(["close", "--token", reviewee])
     assert code == 1
     assert "token cannot close" in stderr
@@ -228,11 +231,10 @@ def test_close_requires_reviewer(review_home: Path) -> None:
 def test_close_success_summary(review_home: Path) -> None:
     """Report summary stats on close."""
     run_command(["create", "--issue", "19", "--task", "0"])
-    reviewer = (
-        run_command(["join", "--issue", "19", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    run_command(["comment", "--token", reviewer, "Open thread"])
-    run_command(["resolve", "--token", reviewer, "--thread", "0"])
+    reviewer = run_command(["join", "--issue", "19", "--task", "0", "--role", "reviewer"])[1]
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Open thread"])
+    run_command(["threads", "resolve", "--token", reviewer, "-n", "0"])
     code, stdout, _stderr = run_command(["close", "--token", reviewer])
     assert code == 0
     assert "review: issue=19 task=0 status=closed" in stdout
@@ -249,9 +251,7 @@ def test_view_requires_token_or_issue_task(review_home: Path) -> None:
 def test_view_rejects_token_and_issue(review_home: Path) -> None:
     """Reject using both token and issue/task."""
     run_command(["create", "--issue", "20", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "20", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
+    token = run_command(["join", "--issue", "20", "--task", "0", "--role", "reviewer"])[1]
     code, _stdout, stderr = run_command(["view", "--token", token, "--issue", "20", "--task", "0"])
     assert code == 1
     assert "use either --token" in stderr
@@ -260,37 +260,34 @@ def test_view_rejects_token_and_issue(review_home: Path) -> None:
 def test_view_shows_threads(review_home: Path) -> None:
     """Show threads and comments in view output."""
     run_command(["create", "--issue", "21", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "21", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    run_command(["comment", "--token", token, "First"])
+    token = run_command(["join", "--issue", "21", "--task", "0", "--role", "reviewer"])[1]
+    run_command(["threads", "create", "--token", token])
+    run_command(["threads", "comment", "--token", token, "-n", "0", "First"])
     _code, stdout, _stderr = run_command(["view", "--token", token])
-    assert "# issue-21: task-0" in stdout
-    assert "## thread-0" in stdout
+    assert "# issue-21: task-0 open" in stdout
+    assert "## thread-0 open" in stdout
     assert "### [reviewer][" in stdout
 
 
 def test_view_by_issue_task_after_close(review_home: Path) -> None:
     """Allow view by issue/task after close."""
     run_command(["create", "--issue", "22", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "22", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    run_command(["comment", "--token", token, "First"])
-    run_command(["resolve", "--token", token, "--thread", "0"])
+    token = run_command(["join", "--issue", "22", "--task", "0", "--role", "reviewer"])[1]
+    run_command(["threads", "create", "--token", token])
+    run_command(["threads", "comment", "--token", token, "-n", "0", "First"])
+    run_command(["threads", "resolve", "--token", token, "-n", "0"])
     run_command(["close", "--token", token])
     code, stdout, _stderr = run_command(["view", "--issue", "22", "--task", "0"])
     assert code == 0
-    assert "# issue-22: task-0" in stdout
+    assert "# issue-22: task-0 closed" in stdout
 
 
 def test_view_thread_missing_errors(review_home: Path) -> None:
     """Reject viewing missing threads."""
     run_command(["create", "--issue", "23", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "23", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    code, _stdout, stderr = run_command(["view", "--token", token, "--thread", "2"])
+    token = run_command(["join", "--issue", "23", "--task", "0", "--role", "reviewer"])[1]
+    run_command(["threads", "create", "--token", token])
+    code, _stdout, stderr = run_command(["threads", "view", "--token", token, "-n", "2"])
     assert code == 1
     assert "thread does not exist" in stderr
 
@@ -317,9 +314,7 @@ def test_list_empty_writes_stderr(review_home: Path) -> None:
 def test_wait_errors_when_closed(review_home: Path) -> None:
     """Error when waiting on closed reviews."""
     run_command(["create", "--issue", "26", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "26", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
+    token = run_command(["join", "--issue", "26", "--task", "0", "--role", "reviewer"])[1]
     run_command(["close", "--token", token])
     code, _stdout, stderr = run_command(["wait", "--token", token])
     assert code == 1
@@ -329,12 +324,8 @@ def test_wait_errors_when_closed(review_home: Path) -> None:
 def test_wait_receives_thread_event(review_home: Path) -> None:
     """Wait should return new thread events."""
     run_command(["create", "--issue", "27", "--task", "0"])
-    reviewer = (
-        run_command(["join", "--issue", "27", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    reviewee = (
-        run_command(["join", "--issue", "27", "--task", "0", "--role", "reviewee"])[1].splitlines()[0].split(" ", 1)[1]
-    )
+    reviewer = run_command(["join", "--issue", "27", "--task", "0", "--role", "reviewer"])[1]
+    reviewee = run_command(["join", "--issue", "27", "--task", "0", "--role", "reviewee"])[1]
 
     events: list[str] = []
 
@@ -347,7 +338,7 @@ def test_wait_receives_thread_event(review_home: Path) -> None:
     thread.start()
     time.sleep(0.2)
 
-    run_command(["comment", "--token", reviewer, "Open thread"])
+    run_command(["threads", "create", "--token", reviewer])
     thread.join(timeout=2)
 
     assert any("event: thread_created" in line for line in events)
@@ -356,15 +347,12 @@ def test_wait_receives_thread_event(review_home: Path) -> None:
 def test_wait_consumes_multiple_events(review_home: Path) -> None:
     """Consume multiple events in one wait call."""
     run_command(["create", "--issue", "28", "--task", "0"])
-    reviewer = (
-        run_command(["join", "--issue", "28", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    reviewee = (
-        run_command(["join", "--issue", "28", "--task", "0", "--role", "reviewee"])[1].splitlines()[0].split(" ", 1)[1]
-    )
+    reviewer = run_command(["join", "--issue", "28", "--task", "0", "--role", "reviewer"])[1]
+    reviewee = run_command(["join", "--issue", "28", "--task", "0", "--role", "reviewee"])[1]
 
-    run_command(["comment", "--token", reviewer, "Open thread"])
-    run_command(["comment", "--token", reviewer, "--thread", "0", "Follow up"])
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Open thread"])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Follow up"])
 
     code, stdout, _stderr = run_command(["wait", "--token", reviewee])
     assert code == 0
@@ -393,10 +381,9 @@ def test_create_rejects_negative_values(review_home: Path, argv: list[str]) -> N
 def test_comment_requires_text(review_home: Path) -> None:
     """Reject empty comments."""
     run_command(["create", "--issue", "30", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "30", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    code, _stdout, stderr = run_command(["comment", "--token", token])
+    token = run_command(["join", "--issue", "30", "--task", "0", "--role", "reviewer"])[1]
+    run_command(["threads", "create", "--token", token])
+    code, _stdout, stderr = run_command(["threads", "comment", "--token", token, "-n", "0"])
     assert code == 1
     assert "comment text is required" in stderr
 
@@ -404,26 +391,49 @@ def test_comment_requires_text(review_home: Path) -> None:
 def test_resolve_rejects_resolved_thread(review_home: Path) -> None:
     """Reject resolving an already resolved thread."""
     run_command(["create", "--issue", "31", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "31", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    run_command(["comment", "--token", token, "Open thread"])
-    run_command(["resolve", "--token", token, "--thread", "0"])
-    code, _stdout, stderr = run_command(["resolve", "--token", token, "--thread", "0"])
+    token = run_command(["join", "--issue", "31", "--task", "0", "--role", "reviewer"])[1]
+    run_command(["threads", "create", "--token", token])
+    run_command(["threads", "comment", "--token", token, "-n", "0", "Open thread"])
+    run_command(["threads", "resolve", "--token", token, "-n", "0"])
+    code, _stdout, stderr = run_command(["threads", "resolve", "--token", token, "-n", "0"])
     assert code == 1
     assert "thread is resolved" in stderr
+
+
+def test_status_reports_counts(review_home: Path) -> None:
+    """Report status counts for a review."""
+    run_command(["create", "--issue", "48", "--task", "0"])
+    reviewer = run_command(["join", "--issue", "48", "--task", "0", "--role", "reviewer"])[1]
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "First"])
+    code, stdout, _stderr = run_command(["status", "--issue", "48", "--task", "0"])
+    assert code == 0
+    assert "review: issue=48 task=0 status=open" in stdout
+    assert "threads: open=1 resolved=0 comments=1" in stdout
+    assert "participants: reviewers=1 reviewees=0" in stdout
+
+
+def test_threads_list_shows_status(review_home: Path) -> None:
+    """List threads with status output."""
+    run_command(["create", "--issue", "49", "--task", "0"])
+    reviewer = run_command(["join", "--issue", "49", "--task", "0", "--role", "reviewer"])[1]
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Note"])
+    code, stdout, _stderr = run_command(["threads", "list", "--issue", "49", "--task", "0"])
+    assert code == 0
+    assert "thread-0:" in stdout
+    assert "status=open" in stdout
 
 
 def test_comment_rejects_closed_review(review_home: Path) -> None:
     """Reject comments on closed reviews."""
     run_command(["create", "--issue", "32", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "32", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    run_command(["comment", "--token", token, "Open thread"])
-    run_command(["resolve", "--token", token, "--thread", "0"])
+    token = run_command(["join", "--issue", "32", "--task", "0", "--role", "reviewer"])[1]
+    run_command(["threads", "create", "--token", token])
+    run_command(["threads", "comment", "--token", token, "-n", "0", "Open thread"])
+    run_command(["threads", "resolve", "--token", token, "-n", "0"])
     run_command(["close", "--token", token])
-    code, _stdout, stderr = run_command(["comment", "--token", token, "--thread", "0", "Nope"])
+    code, _stdout, stderr = run_command(["threads", "comment", "--token", token, "-n", "0", "Nope"])
     assert code == 1
     assert "review is closed" in stderr
 
@@ -457,17 +467,16 @@ def test_join_create_rejects_active_issue_task(review_home: Path) -> None:
 
 
 def test_join_token_format(review_home: Path) -> None:
-    """Tokens include pool name and issue/task."""
+    """Tokens include pool name and pid."""
     run_command(["create", "--issue", "35", "--task", "2"])
     code, stdout, _stderr = run_command(["join", "--issue", "35", "--task", "2", "--role", "reviewer"])
     assert code == 0
-    token = stdout.splitlines()[0].split(" ", 1)[1]
+    token = stdout.splitlines()[0]
     parts = token.split("-")
-    assert len(parts) == 3
-    name, issue, task = parts
-    assert name in review.NAME_POOL
-    assert issue == "35"
-    assert task == "2"
+    assert len(parts) == 2
+    name, pid = parts
+    assert name in reviewctl.NAME_POOL
+    assert pid.isdigit()
 
 
 @pytest.mark.parametrize(
@@ -487,25 +496,20 @@ def test_join_rejects_negative_values(review_home: Path, argv: list[str]) -> Non
 def test_comment_allows_reviewee_reply(review_home: Path) -> None:
     """Allow reviewees to comment in existing threads."""
     run_command(["create", "--issue", "36", "--task", "0"])
-    reviewer = (
-        run_command(["join", "--issue", "36", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    reviewee = (
-        run_command(["join", "--issue", "36", "--task", "0", "--role", "reviewee"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    run_command(["comment", "--token", reviewer, "Open thread"])
-    code, stdout, _stderr = run_command(["comment", "--token", reviewee, "--thread", "0", "Reply"])
+    reviewer = run_command(["join", "--issue", "36", "--task", "0", "--role", "reviewer"])[1]
+    reviewee = run_command(["join", "--issue", "36", "--task", "0", "--role", "reviewee"])[1]
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Open thread"])
+    code, stdout, _stderr = run_command(["threads", "comment", "--token", reviewee, "-n", "0", "Reply"])
     assert code == 0
-    assert stdout == "comments: 2"
+    assert stdout == "thread: 0 comments: 2"
 
 
 def test_comment_rejects_negative_thread(review_home: Path) -> None:
     """Reject comments with negative thread numbers."""
     run_command(["create", "--issue", "37", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "37", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    code, _stdout, stderr = run_command(["comment", "--token", token, "--thread", "-1", "Nope"])
+    token = run_command(["join", "--issue", "37", "--task", "0", "--role", "reviewer"])[1]
+    code, _stdout, stderr = run_command(["threads", "comment", "--token", token, "-n", "-1", "Nope"])
     assert code == 1
     assert "thread must be a non-negative integer" in stderr
 
@@ -513,18 +517,17 @@ def test_comment_rejects_negative_thread(review_home: Path) -> None:
 def test_resolve_allows_no_comment(review_home: Path) -> None:
     """Allow resolving threads without a comment."""
     run_command(["create", "--issue", "38", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "38", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    run_command(["comment", "--token", token, "Open thread"])
-    code, stdout, _stderr = run_command(["resolve", "--token", token, "--thread", "0"])
+    token = run_command(["join", "--issue", "38", "--task", "0", "--role", "reviewer"])[1]
+    run_command(["threads", "create", "--token", token])
+    run_command(["threads", "comment", "--token", token, "-n", "0", "Open thread"])
+    code, stdout, _stderr = run_command(["threads", "resolve", "--token", token, "-n", "0"])
     assert code == 0
-    assert stdout == "comments: 1"
+    assert stdout == "thread: 0 comments: 1"
 
 
 def test_resolve_rejects_invalid_token(review_home: Path) -> None:
     """Reject resolves with invalid tokens."""
-    code, _stdout, stderr = run_command(["resolve", "--token", "bad-token", "--thread", "0"])
+    code, _stdout, stderr = run_command(["threads", "resolve", "--token", "bad-token", "-n", "0"])
     assert code == 1
     assert "invalid token" in stderr
 
@@ -532,10 +535,8 @@ def test_resolve_rejects_invalid_token(review_home: Path) -> None:
 def test_resolve_rejects_negative_thread(review_home: Path) -> None:
     """Reject resolving with negative thread numbers."""
     run_command(["create", "--issue", "39", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "39", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    code, _stdout, stderr = run_command(["resolve", "--token", token, "--thread", "-1"])
+    token = run_command(["join", "--issue", "39", "--task", "0", "--role", "reviewer"])[1]
+    code, _stdout, stderr = run_command(["threads", "resolve", "--token", token, "-n", "-1"])
     assert code == 1
     assert "thread must be a non-negative integer" in stderr
 
@@ -543,16 +544,14 @@ def test_resolve_rejects_negative_thread(review_home: Path) -> None:
 def test_view_rejects_negative_thread(review_home: Path) -> None:
     """Reject view with negative thread numbers."""
     run_command(["create", "--issue", "40", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "40", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    code, _stdout, stderr = run_command(["view", "--token", token, "--thread", "-1"])
+    token = run_command(["join", "--issue", "40", "--task", "0", "--role", "reviewer"])[1]
+    code, _stdout, stderr = run_command(["threads", "view", "--token", token, "-n", "-1"])
     assert code == 1
     assert "thread must be a non-negative integer" in stderr
 
 
 def test_view_rejects_missing_review(review_home: Path) -> None:
-    """Reject viewing a missing review."""
+    """Reject viewing a missing reviewctl."""
     code, _stdout, stderr = run_command(["view", "--issue", "41", "--task", "0"])
     assert code == 1
     assert "review does not exist" in stderr
@@ -561,23 +560,21 @@ def test_view_rejects_missing_review(review_home: Path) -> None:
 def test_view_thread_filter(review_home: Path) -> None:
     """View should filter to a single thread."""
     run_command(["create", "--issue", "42", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "42", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    run_command(["comment", "--token", token, "First thread"])
-    run_command(["comment", "--token", token, "Second thread"])
-    code, stdout, _stderr = run_command(["view", "--token", token, "--thread", "0"])
+    token = run_command(["join", "--issue", "42", "--task", "0", "--role", "reviewer"])[1]
+    run_command(["threads", "create", "--token", token])
+    run_command(["threads", "comment", "--token", token, "-n", "0", "First thread"])
+    run_command(["threads", "create", "--token", token])
+    run_command(["threads", "comment", "--token", token, "-n", "1", "Second thread"])
+    code, stdout, _stderr = run_command(["threads", "view", "--token", token, "-n", "0"])
     assert code == 0
-    assert "## thread-0" in stdout
+    assert "## thread-0 open" in stdout
     assert "## thread-1" not in stdout
 
 
 def test_list_excludes_closed_reviews(review_home: Path) -> None:
     """Do not list closed reviews."""
     run_command(["create", "--issue", "43", "--task", "0"])
-    reviewer = (
-        run_command(["join", "--issue", "43", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
+    reviewer = run_command(["join", "--issue", "43", "--task", "0", "--role", "reviewer"])[1]
     run_command(["close", "--token", reviewer])
     run_command(["create", "--issue", "44", "--task", "0"])
     code, stdout, _stderr = run_command(["list"])
@@ -587,11 +584,9 @@ def test_list_excludes_closed_reviews(review_home: Path) -> None:
 
 
 def test_close_rejects_already_closed(review_home: Path) -> None:
-    """Reject closing an already closed review."""
+    """Reject closing an already closed reviewctl."""
     run_command(["create", "--issue", "45", "--task", "0"])
-    token = (
-        run_command(["join", "--issue", "45", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
+    token = run_command(["join", "--issue", "45", "--task", "0", "--role", "reviewer"])[1]
     run_command(["close", "--token", token])
     code, _stdout, stderr = run_command(["close", "--token", token])
     assert code == 1
@@ -601,20 +596,17 @@ def test_close_rejects_already_closed(review_home: Path) -> None:
 def test_wait_receives_resolve_event_with_comment(review_home: Path) -> None:
     """Wait returns resolved events with payload."""
     run_command(["create", "--issue", "46", "--task", "0"])
-    reviewer = (
-        run_command(["join", "--issue", "46", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    reviewee = (
-        run_command(["join", "--issue", "46", "--task", "0", "--role", "reviewee"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    run_command(["comment", "--token", reviewer, "Open thread"])
-    run_command(["resolve", "--token", reviewer, "--thread", "0", "Done"])
+    reviewer = run_command(["join", "--issue", "46", "--task", "0", "--role", "reviewer"])[1]
+    reviewee = run_command(["join", "--issue", "46", "--task", "0", "--role", "reviewee"])[1]
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Open thread"])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "--resolve", "Done"])
     code, stdout, _stderr = run_command(["wait", "--token", reviewee])
     assert code == 0
     lines = stdout.splitlines()
     resolved_line = next(line for line in lines if "event: thread_resolved" in line)
     assert "thread:0" in resolved_line
-    assert f"author:{reviewer}" in resolved_line
+    assert "author_role:reviewer" in resolved_line
     assert "count:2" in resolved_line
     assert "with_comment:1" in resolved_line
 
@@ -622,12 +614,8 @@ def test_wait_receives_resolve_event_with_comment(review_home: Path) -> None:
 def test_wait_receives_review_closed_event(review_home: Path) -> None:
     """Wait returns review closed events."""
     run_command(["create", "--issue", "47", "--task", "0"])
-    reviewer = (
-        run_command(["join", "--issue", "47", "--task", "0", "--role", "reviewer"])[1].splitlines()[0].split(" ", 1)[1]
-    )
-    reviewee = (
-        run_command(["join", "--issue", "47", "--task", "0", "--role", "reviewee"])[1].splitlines()[0].split(" ", 1)[1]
-    )
+    reviewer = run_command(["join", "--issue", "47", "--task", "0", "--role", "reviewer"])[1]
+    reviewee = run_command(["join", "--issue", "47", "--task", "0", "--role", "reviewee"])[1]
     events: list[str] = []
 
     def wait_for_close() -> None:
@@ -643,6 +631,6 @@ def test_wait_receives_review_closed_event(review_home: Path) -> None:
 
     assert not thread.is_alive()
     closed_line = next(line for line in events if "event: review_closed" in line)
-    assert f"author:{reviewer}" in closed_line
+    assert "author_role:reviewer" in closed_line
     assert "thread:-" in closed_line
     assert "count:-" in closed_line

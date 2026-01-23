@@ -765,20 +765,26 @@ def cmd_view(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     sys.stdout.write("\n".join(lines).rstrip("\n") + "\n")
 
 
-def cmd_list(conn: sqlite3.Connection, _args: argparse.Namespace) -> None:
-    """List active reviews."""
-    reviews = conn.execute("SELECT id, scope FROM reviews WHERE status = 'open' ORDER BY created_at ASC").fetchall()
+def cmd_list(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
+    """List reviews."""
+    if args.all:
+        reviews = conn.execute("SELECT id, status, scope FROM reviews ORDER BY created_at ASC").fetchall()
+    else:
+        reviews = conn.execute(
+            "SELECT id, status, scope FROM reviews WHERE status = 'open' ORDER BY created_at ASC"
+        ).fetchall()
     if not reviews:
-        eprint("no active reviews")
+        eprint("no reviews" if args.all else "no active reviews")
         return
     for review in reviews:
+        open_threads = count_threads_by_status(conn, review["id"], "open")
+        comments = count_comments_for_review(conn, review["id"])
         header = scope_header(review["scope"].strip())
-        sys.stdout.write(
-            "review: id={review_id} scope={header}\n".format(
-                review_id=review["id"],
-                header=header or "-",
-            )
+        line = (
+            f"review: id={review['id']} status={review['status']} "
+            f"open_threads={open_threads} comments={comments} scope={header or '-'}"
         )
+        sys.stdout.write(f"{line}\n")
 
 
 def cmd_threads_list(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
@@ -946,7 +952,20 @@ def add_view_parser(subparsers: Any) -> None:
 
 def add_list_parser(subparsers: Any) -> None:
     """Register the list command."""
-    list_parser = subparsers.add_parser("list", help="List active reviews")
+    list_parser = subparsers.add_parser(
+        "list",
+        help="List reviews",
+        description=(
+            "List review sessions. "
+            "By default, only open reviews are shown. Use --all to include closed reviews. "
+            "Shows review ID, status, number of open threads, total comments, and scope summary."
+        ),
+    )
+    list_parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Show all reviews, including closed ones",
+    )
     list_parser.set_defaults(func=cmd_list)
 
 

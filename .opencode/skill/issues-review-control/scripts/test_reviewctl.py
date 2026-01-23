@@ -320,14 +320,14 @@ def test_view_thread_missing_errors(review_home: Path) -> None:
 
 
 def test_list_outputs_active_reviews(review_home: Path) -> None:
-    """List active reviews with scope headers."""
+    """List active reviews with status, thread count, comment count, and scope."""
     first_id = create_review("Scope 24\nDetails")
     second_id = create_review("Scope 25")
     code, stdout, _stderr = run_command(["list"])
     assert code == 0
     lines = stdout.splitlines()
-    assert any(f"review: id={first_id} scope=Scope 24" == line for line in lines)
-    assert any(f"review: id={second_id} scope=Scope 25" == line for line in lines)
+    assert any(f"review: id={first_id} status=open open_threads=0 comments=0 scope=Scope 24" == line for line in lines)
+    assert any(f"review: id={second_id} status=open open_threads=0 comments=0 scope=Scope 25" == line for line in lines)
 
 
 def test_list_empty_writes_stderr(review_home: Path) -> None:
@@ -599,6 +599,18 @@ def test_list_excludes_closed_reviews(review_home: Path) -> None:
     assert code == 0
     assert f"review: id={open_id}" in stdout
     assert f"review: id={closed_id}" not in stdout
+
+
+def test_list_all_includes_closed_reviews(review_home: Path) -> None:
+    """List all reviews including closed ones with --all flag."""
+    closed_id = create_review("Scope closed all")
+    reviewer = join_review(closed_id, "alex", "reviewer")
+    run_command(["close", "--user", reviewer])
+    open_id = create_review("Scope open all")
+    code, stdout, _stderr = run_command(["list", "--all"])
+    assert code == 0
+    assert f"review: id={open_id} status=open" in stdout
+    assert f"review: id={closed_id} status=closed" in stdout
 
 
 def test_close_rejects_already_closed(review_home: Path) -> None:

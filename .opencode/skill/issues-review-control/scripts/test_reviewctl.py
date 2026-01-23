@@ -269,16 +269,16 @@ def test_view_requires_token_or_id(review_home: Path) -> None:
     """Require an id when no token is provided."""
     code, _stdout, stderr = run_command(["view"])
     assert code == 1
-    assert "--id is required" in stderr
+    assert "--review is required" in stderr
 
 
 def test_view_rejects_token_and_id(review_home: Path) -> None:
     """Reject using both token and id."""
     review_id = create_review("Scope view options")
     token = join_review(review_id, "alex", "reviewer")
-    code, _stdout, stderr = run_command(["view", "--user", token, "--id", review_id])
+    code, _stdout, stderr = run_command(["view", "--user", token, "--review", review_id])
     assert code == 1
-    assert "use either --user" in stderr
+    assert "use either --user or --review" in stderr
 
 
 def test_view_shows_threads(review_home: Path) -> None:
@@ -304,7 +304,7 @@ def test_view_by_id_after_close(review_home: Path) -> None:
     run_command(["threads", "comment", "--user", token, "-n", "0", "First"])
     run_command(["threads", "resolve", "--user", token, "-n", "0", "--force"])
     run_command(["close", "--user", token])
-    code, stdout, _stderr = run_command(["view", "--id", review_id])
+    code, stdout, _stderr = run_command(["view", "--review", review_id])
     assert code == 0
     assert f"# review-{review_id} closed" in stdout
 
@@ -399,7 +399,7 @@ def test_view_includes_scope_lines(review_home: Path) -> None:
     """Include scope lines directly after the header."""
     scope = "Scope header\nDetails line"
     review_id = create_review(scope)
-    code, stdout, _stderr = run_command(["view", "--id", review_id])
+    code, stdout, _stderr = run_command(["view", "--review", review_id])
     assert code == 0
     lines = stdout.splitlines()
     assert lines[0] == f"# review-{review_id} open"
@@ -435,7 +435,7 @@ def test_status_reports_counts(review_home: Path) -> None:
     reviewer = join_review(review_id, "alex", "reviewer")
     run_command(["threads", "create", "--user", reviewer])
     run_command(["threads", "comment", "--user", reviewer, "-n", "0", "First"])
-    code, stdout, _stderr = run_command(["status", "--id", review_id])
+    code, stdout, _stderr = run_command(["status", "--review", review_id])
     assert code == 0
     assert f"review: id={review_id} status=open" in stdout
     assert "threads: open=1 resolved=0 comments=1" in stdout
@@ -454,19 +454,19 @@ def test_status_with_user_token(review_home: Path) -> None:
 
 
 def test_status_rejects_missing_args(review_home: Path) -> None:
-    """Reject status without --user or --id."""
+    """Reject status without --user or --review."""
     code, _stdout, stderr = run_command(["status"])
     assert code == 1
-    assert "--id is required when --user is not used" in stderr
+    assert "--review is required when --user is not used" in stderr
 
 
 def test_status_rejects_both_args(review_home: Path) -> None:
-    """Reject status with both --user and --id."""
+    """Reject status with both --user and --review."""
     review_id = create_review("Scope status both")
     reviewer = join_review(review_id, "alex", "reviewer")
-    code, _stdout, stderr = run_command(["status", "--user", reviewer, "--id", review_id])
+    code, _stdout, stderr = run_command(["status", "--user", reviewer, "--review", review_id])
     assert code == 1
-    assert "use either --user or --id" in stderr
+    assert "use either --user or --review" in stderr
 
 
 def test_threads_list_shows_status(review_home: Path) -> None:
@@ -475,7 +475,7 @@ def test_threads_list_shows_status(review_home: Path) -> None:
     reviewer = join_review(review_id, "alex", "reviewer")
     run_command(["threads", "create", "--user", reviewer])
     run_command(["threads", "comment", "--user", reviewer, "-n", "0", "Note"])
-    code, stdout, _stderr = run_command(["threads", "list", "--id", review_id])
+    code, stdout, _stderr = run_command(["threads", "list", "--review", review_id])
     assert code == 0
     assert "thread-0:" in stdout
     assert "status=open" in stdout
@@ -505,7 +505,7 @@ def test_create_allows_multiword_scope(review_home: Path) -> None:
     """Preserve multi-word scope text."""
     scope = "Multi word scope"
     review_id = create_review(scope)
-    code, stdout, _stderr = run_command(["view", "--id", review_id])
+    code, stdout, _stderr = run_command(["view", "--review", review_id])
     assert code == 0
     assert f"# review-{review_id} open" in stdout
     assert scope in stdout
@@ -597,7 +597,7 @@ def test_view_rejects_negative_thread(review_home: Path) -> None:
 
 def test_view_rejects_missing_review(review_home: Path) -> None:
     """Reject viewing a missing reviewctl."""
-    code, _stdout, stderr = run_command(["view", "--id", "deadbeef"])
+    code, _stdout, stderr = run_command(["view", "--review", "deadbeef"])
     assert code == 1
     assert "review does not exist" in stderr
 

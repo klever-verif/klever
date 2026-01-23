@@ -235,9 +235,9 @@ def resolve_review_from_args(
 ) -> sqlite3.Row:
     """Resolve a review based on user id or review ID."""
     if user and review_id is not None:
-        raise ReviewError("use either --user or --id")
+        raise ReviewError("use either --user or --review")
     if user is None and review_id is None:
-        raise ReviewError("--id is required when --user is not used")
+        raise ReviewError("--review is required when --user is not used")
     if user:
         participant = fetch_participant(conn, user)
         if not participant:
@@ -245,7 +245,7 @@ def resolve_review_from_args(
         review = fetch_review(conn, participant["review_id"])
     else:
         if review_id is None:
-            raise ReviewError("--id is required when --user is not used")
+            raise ReviewError("--review is required when --user is not used")
         review = fetch_review(conn, review_id)
     if not review:
         raise ReviewError("review does not exist")
@@ -942,7 +942,7 @@ def add_status_parser(subparsers: Any) -> None:
         description=(
             "Show the current status of a review session including thread counts, "
             "comment counts, and participant information. "
-            "Specify either --user (participant token) or --id (review ID), but not both."
+            "Specify either --user (participant token) or --review (review ID), but not both."
         ),
     )
     status_parser.add_argument(
@@ -951,7 +951,7 @@ def add_status_parser(subparsers: Any) -> None:
         help="Participant token to identify the review",
     )
     status_parser.add_argument(
-        "--id",
+        "--review",
         dest="review_id",
         help="Review ID to show status for",
     )
@@ -966,7 +966,7 @@ def add_view_parser(subparsers: Any) -> None:
         description=(
             "View the full contents of a review session as Markdown. "
             "Includes scope, all threads, and comments. "
-            "Specify either --user (participant token) or --id (review ID), but not both."
+            "Specify either --user (participant token) or --review (review ID), but not both."
         ),
     )
     view_parser.add_argument(
@@ -975,7 +975,7 @@ def add_view_parser(subparsers: Any) -> None:
         help="Participant token to identify the review",
     )
     view_parser.add_argument(
-        "--id",
+        "--review",
         dest="review_id",
         help="Review ID to view",
     )
@@ -1099,7 +1099,7 @@ def add_threads_parsers(subparsers: Any) -> None:
         description=(
             "List all threads in a review session. "
             "Shows thread number, status, comment count, and author. "
-            "Specify either --user (participant token) or --id (review ID), but not both."
+            "Specify either --user (participant token) or --review (review ID), but not both."
         ),
     )
     threads_list.add_argument(
@@ -1108,7 +1108,7 @@ def add_threads_parsers(subparsers: Any) -> None:
         help="Participant token to identify the review",
     )
     threads_list.add_argument(
-        "--id",
+        "--review",
         dest="review_id",
         help="Review ID to list threads for",
     )
@@ -1120,7 +1120,7 @@ def add_threads_parsers(subparsers: Any) -> None:
         description=(
             "View a single thread with all its comments as Markdown. "
             "Includes review scope for context. "
-            "Specify either --user (participant token) or --id (review ID), but not both."
+            "Specify either --user (participant token) or --review (review ID), but not both."
         ),
     )
     threads_view.add_argument(
@@ -1129,7 +1129,7 @@ def add_threads_parsers(subparsers: Any) -> None:
         help="Participant token to identify the review",
     )
     threads_view.add_argument(
-        "--id",
+        "--review",
         dest="review_id",
         help="Review ID containing the thread",
     )

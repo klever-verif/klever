@@ -579,7 +579,7 @@ def cmd_threads_comment(conn: sqlite3.Connection, args: argparse.Namespace) -> N
         if args.resolve:
             if thread["author_token"] != participant["token"]:
                 raise ReviewError("user cannot resolve this thread")
-            if not args.force and not has_reviewee_comment(conn, thread["id"]):
+            if not has_reviewee_comment(conn, thread["id"]):
                 raise ReviewError("cannot resolve thread without reviewee response")
             conn.execute(
                 "UPDATE threads SET status = 'resolved', resolved_at = ? WHERE id = ?",
@@ -1056,11 +1056,6 @@ def add_threads_parsers(subparsers: Any) -> None:
         "--resolve",
         action="store_true",
         help="Resolve the thread after adding the comment (reviewer only)",
-    )
-    threads_comment.add_argument(
-        "--force",
-        action="store_true",
-        help="Resolve even without reviewee response",
     )
     threads_comment.add_argument(
         "comment",

@@ -730,20 +730,6 @@ def test_resolve_with_comment_requires_reviewee_response(review_home: Path) -> N
     assert "cannot resolve thread without reviewee response" in stderr
 
 
-def test_resolve_with_comment_force_bypasses_check(review_home: Path) -> None:
-    """Allow resolving with comment and --force without reviewee response."""
-    review_id = create_review("Scope resolve comment force")
-    reviewer = join_review(review_id, "alex", "reviewer")
-    join_review(review_id, "sam", "reviewee")
-    run_command(["threads", "create", "--user", reviewer])
-    run_command(["threads", "comment", "--user", reviewer, "-n", "0", "Open thread"])
-    code, stdout, _stderr = run_command(
-        ["threads", "comment", "--user", reviewer, "-n", "0", "--resolve", "--force", "Final"]
-    )
-    assert code == 0
-    assert stdout == "thread: 0 comments: 2"
-
-
 def test_resolve_succeeds_after_reviewee_comment(review_home: Path) -> None:
     """Allow resolving thread after reviewee has commented."""
     review_id = create_review("Scope resolve after reviewee")

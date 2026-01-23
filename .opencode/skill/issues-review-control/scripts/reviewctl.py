@@ -911,8 +911,21 @@ def add_join_parser(subparsers: Any) -> None:
 
 def add_close_parser(subparsers: Any) -> None:
     """Register the close command."""
-    close_parser = subparsers.add_parser("close", help="Close a review")
-    close_parser.add_argument("--user", required=True)
+    close_parser = subparsers.add_parser(
+        "close",
+        help="Close a review",
+        description=(
+            "Close a review session. Only a reviewer can close the review, "
+            "and all threads must be resolved before closing. "
+            "The review ID is derived from the participant token. "
+            "On success, prints review statistics."
+        ),
+    )
+    close_parser.add_argument(
+        "--user",
+        required=True,
+        help="Participant token (must be a reviewer)",
+    )
     close_parser.set_defaults(func=cmd_close)
 
 

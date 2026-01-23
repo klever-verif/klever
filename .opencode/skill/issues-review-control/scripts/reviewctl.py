@@ -880,10 +880,32 @@ def add_create_parser(subparsers: Any) -> None:
 
 def add_join_parser(subparsers: Any) -> None:
     """Register the join command."""
-    join_parser = subparsers.add_parser("join", help="Join a review")
-    join_parser.add_argument("review_id")
-    join_parser.add_argument("--name", required=True)
-    join_parser.add_argument("--role", choices=["reviewer", "reviewee"], required=True)
+    join_parser = subparsers.add_parser(
+        "join",
+        help="Join a review",
+        description=(
+            "Join an existing review session as a participant. "
+            "Requires a unique name and a role (reviewer or reviewee). "
+            "On success, a participant token is printed to stdout. "
+            "This token is used for all subsequent operations (creating threads, commenting, etc.)."
+        ),
+    )
+    join_parser.add_argument(
+        "review_id",
+        metavar="REVIEW_ID",
+        help="ID of the review session to join",
+    )
+    join_parser.add_argument(
+        "--name",
+        required=True,
+        help="Participant name (must be unique within the review)",
+    )
+    join_parser.add_argument(
+        "--role",
+        choices=["reviewer", "reviewee"],
+        required=True,
+        help="Participant role in the review session",
+    )
     join_parser.set_defaults(func=cmd_join)
 
 

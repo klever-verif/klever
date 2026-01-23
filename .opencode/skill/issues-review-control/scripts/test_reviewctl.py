@@ -388,6 +388,35 @@ def test_wait_consumes_multiple_events(review_home: Path) -> None:
     assert any("event: comment" in line for line in lines)
 
 
+def test_wait_skips_own_events(review_home: Path) -> None:
+    """Ignore events authored by the waiting participant."""
+    review_id = create_review("Scope wait skip self")
+    reviewer = join_review(review_id, "alex", "reviewer")
+    reviewee = join_review(review_id, "sam", "reviewee")
+
+    events: list[str] = []
+
+    def wait_for_reviewer() -> None:
+        code, stdout, _stderr = run_command(["wait", "--user", reviewer])
+        assert code == 0
+        events.extend(stdout.splitlines())
+
+    thread = threading.Thread(target=wait_for_reviewer)
+    thread.start()
+    time.sleep(0.2)
+
+    run_command(["threads", "create", "--user", reviewer])
+    time.sleep(0.2)
+    assert thread.is_alive()
+
+    run_command(["threads", "comment", "--user", reviewee, "-n", "0", "Reply"])
+    thread.join(timeout=2)
+
+    assert not thread.is_alive()
+    assert any("event: comment" in line for line in events)
+    assert all("event: thread_created" not in line for line in events)
+
+
 def test_wait_rejects_invalid_token(review_home: Path) -> None:
     """Reject waiting with invalid tokens."""
     code, _stdout, stderr = run_command(["wait", "--user", "bad-token"])

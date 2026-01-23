@@ -848,9 +848,15 @@ def cmd_wait(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
                     "UPDATE participants SET last_event_id = ? WHERE id = ?",
                     (events[-1]["id"], participant["id"]),
                 )
-            for event in events:
-                sys.stdout.write(f"{format_event(conn, event)}\n")
-            return
+            visible_events = [
+                event
+                for event in events
+                if event["author_token"] is None or event["author_token"] != participant["token"]
+            ]
+            if visible_events:
+                for event in visible_events:
+                    sys.stdout.write(f"{format_event(conn, event)}\n")
+                return
         review = fetch_review(conn, participant["review_id"])
         if review is None or review["status"] == "closed":
             raise ReviewError("review is closed")

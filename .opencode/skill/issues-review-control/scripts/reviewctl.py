@@ -927,6 +927,7 @@ def add_close_parser(subparsers: Any) -> None:
     )
     close_parser.add_argument(
         "--user",
+        metavar="USER_ID",
         required=True,
         help="Participant token (must be a reviewer)",
     )
@@ -946,6 +947,7 @@ def add_status_parser(subparsers: Any) -> None:
     )
     status_parser.add_argument(
         "--user",
+        metavar="USER_ID",
         help="Participant token to identify the review",
     )
     status_parser.add_argument(
@@ -958,9 +960,25 @@ def add_status_parser(subparsers: Any) -> None:
 
 def add_view_parser(subparsers: Any) -> None:
     """Register the view command."""
-    view_parser = subparsers.add_parser("view", help="View review contents")
-    view_parser.add_argument("--user")
-    view_parser.add_argument("--id", dest="review_id")
+    view_parser = subparsers.add_parser(
+        "view",
+        help="View review contents",
+        description=(
+            "View the full contents of a review session as Markdown. "
+            "Includes scope, all threads, and comments. "
+            "Specify either --user (participant token) or --id (review ID), but not both."
+        ),
+    )
+    view_parser.add_argument(
+        "--user",
+        metavar="USER_ID",
+        help="Participant token to identify the review",
+    )
+    view_parser.add_argument(
+        "--id",
+        dest="review_id",
+        help="Review ID to view",
+    )
     view_parser.set_defaults(func=cmd_view)
 
 
@@ -985,43 +1003,168 @@ def add_list_parser(subparsers: Any) -> None:
 
 def add_threads_parsers(subparsers: Any) -> None:
     """Register thread subcommands."""
-    threads_parser = subparsers.add_parser("threads", help="Manage threads")
+    threads_parser = subparsers.add_parser(
+        "threads",
+        help="Manage threads",
+        description=(
+            "Commands for managing review threads. "
+            "Threads are used to track individual discussion topics within a review."
+        ),
+    )
     threads_subparsers = threads_parser.add_subparsers(dest="threads_command", required=True)
 
-    threads_create = threads_subparsers.add_parser("create", help="Create a thread")
-    threads_create.add_argument("--user", required=True)
+    threads_create = threads_subparsers.add_parser(
+        "create",
+        help="Create a thread",
+        description=(
+            "Create a new discussion thread in a review. "
+            "Only reviewers can create threads. "
+            "On success, prints the new thread identifier (e.g., thread-0)."
+        ),
+    )
+    threads_create.add_argument(
+        "--user",
+        metavar="USER_ID",
+        required=True,
+        help="Participant token (must be a reviewer)",
+    )
     threads_create.set_defaults(func=cmd_threads_create)
 
-    threads_comment = threads_subparsers.add_parser("comment", help="Add a comment to a thread")
-    threads_comment.add_argument("--user", required=True)
-    threads_comment.add_argument("-n", "--thread", type=int, required=True)
-    threads_comment.add_argument("--resolve", action="store_true")
-    threads_comment.add_argument("--force", action="store_true", help="Resolve even without reviewee response")
-    threads_comment.add_argument("comment", nargs=argparse.REMAINDER)
+    threads_comment = threads_subparsers.add_parser(
+        "comment",
+        help="Add a comment to a thread",
+        description=(
+            "Add a comment to an existing thread. "
+            "Both reviewers and reviewees can comment. "
+            "Optionally resolve the thread with --resolve (reviewer only)."
+        ),
+    )
+    threads_comment.add_argument(
+        "--user",
+        metavar="USER_ID",
+        required=True,
+        help="Participant token of the commenter",
+    )
+    threads_comment.add_argument(
+        "-n",
+        "--thread",
+        type=int,
+        required=True,
+        help="Thread number to comment on",
+    )
+    threads_comment.add_argument(
+        "--resolve",
+        action="store_true",
+        help="Resolve the thread after adding the comment (reviewer only)",
+    )
+    threads_comment.add_argument(
+        "--force",
+        action="store_true",
+        help="Resolve even without reviewee response",
+    )
+    threads_comment.add_argument(
+        "comment",
+        nargs=argparse.REMAINDER,
+        help="Comment text; can also be piped via stdin",
+    )
     threads_comment.set_defaults(func=cmd_threads_comment)
 
-    threads_resolve = threads_subparsers.add_parser("resolve", help="Resolve a thread")
-    threads_resolve.add_argument("--user", required=True)
-    threads_resolve.add_argument("-n", "--thread", type=int, required=True)
-    threads_resolve.add_argument("--force", action="store_true", help="Resolve even without reviewee response")
+    threads_resolve = threads_subparsers.add_parser(
+        "resolve",
+        help="Resolve a thread",
+        description=(
+            "Mark a thread as resolved without adding a comment. "
+            "Only the thread author (reviewer) can resolve it. "
+            "Requires a reviewee response unless --force is used."
+        ),
+    )
+    threads_resolve.add_argument(
+        "--user",
+        metavar="USER_ID",
+        required=True,
+        help="Participant token (must be the thread author)",
+    )
+    threads_resolve.add_argument(
+        "-n",
+        "--thread",
+        type=int,
+        required=True,
+        help="Thread number to resolve",
+    )
+    threads_resolve.add_argument(
+        "--force",
+        action="store_true",
+        help="Resolve even without reviewee response",
+    )
     threads_resolve.set_defaults(func=cmd_threads_resolve)
 
-    threads_list = threads_subparsers.add_parser("list", help="List threads")
-    threads_list.add_argument("--user")
-    threads_list.add_argument("--id", dest="review_id")
+    threads_list = threads_subparsers.add_parser(
+        "list",
+        help="List threads",
+        description=(
+            "List all threads in a review session. "
+            "Shows thread number, status, comment count, and author. "
+            "Specify either --user (participant token) or --id (review ID), but not both."
+        ),
+    )
+    threads_list.add_argument(
+        "--user",
+        metavar="USER_ID",
+        help="Participant token to identify the review",
+    )
+    threads_list.add_argument(
+        "--id",
+        dest="review_id",
+        help="Review ID to list threads for",
+    )
     threads_list.set_defaults(func=cmd_threads_list)
 
-    threads_view = threads_subparsers.add_parser("view", help="View a thread")
-    threads_view.add_argument("--user")
-    threads_view.add_argument("--id", dest="review_id")
-    threads_view.add_argument("-n", "--thread", type=int, required=True)
+    threads_view = threads_subparsers.add_parser(
+        "view",
+        help="View a thread",
+        description=(
+            "View a single thread with all its comments as Markdown. "
+            "Includes review scope for context. "
+            "Specify either --user (participant token) or --id (review ID), but not both."
+        ),
+    )
+    threads_view.add_argument(
+        "--user",
+        metavar="USER_ID",
+        help="Participant token to identify the review",
+    )
+    threads_view.add_argument(
+        "--id",
+        dest="review_id",
+        help="Review ID containing the thread",
+    )
+    threads_view.add_argument(
+        "-n",
+        "--thread",
+        type=int,
+        required=True,
+        help="Thread number to view",
+    )
     threads_view.set_defaults(func=cmd_threads_view)
 
 
 def add_wait_parser(subparsers: Any) -> None:
     """Register the wait command."""
-    wait_parser = subparsers.add_parser("wait", help="Wait for review events")
-    wait_parser.add_argument("--user", required=True)
+    wait_parser = subparsers.add_parser(
+        "wait",
+        help="Wait for review events",
+        description=(
+            "Block and wait for new events in a review session. "
+            "Returns when new events occur (thread created, comment added, etc.). "
+            "Useful for building interactive review workflows."
+        ),
+    )
+    wait_parser.add_argument(
+        "--user",
+        metavar="USER_ID",
+        required=True,
+        help="Participant token to wait for events",
+    )
     wait_parser.set_defaults(func=cmd_wait)
 
 

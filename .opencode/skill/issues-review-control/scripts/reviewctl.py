@@ -6,11 +6,11 @@ from __future__ import annotations
 import argparse
 import io
 import os
+import re
 import select
 import sqlite3
 import sys
 import time
-import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -212,6 +212,12 @@ def validate_non_negative(value: int, label: str) -> None:
         raise ReviewError(f"{label} must be a non-negative integer")
 
 
+def validate_review_id(review_id: str) -> None:
+    """Validate review ID format (alphanumeric, underscores, dashes only)."""
+    if not re.match(r"^[a-zA-Z0-9_-]+$", review_id):
+        raise ReviewError("review ID must contain only alphanumeric characters, underscores, or dashes")
+
+
 def fetch_review(conn: sqlite3.Connection, review_id: str) -> sqlite3.Row | None:
     """Fetch a review by ID."""
     return conn.execute("SELECT * FROM reviews WHERE id = ?", (review_id,)).fetchone()
@@ -409,14 +415,6 @@ def scope_header(scope: str) -> str:
     return lines[0] if lines else ""
 
 
-def generate_review_id(conn: sqlite3.Connection) -> str:
-    """Return a unique review ID."""
-    while True:
-        review_id = uuid.uuid4().hex[:8]
-        if not fetch_review(conn, review_id):
-            return review_id
-
-
 def format_event(conn: sqlite3.Connection, event: sqlite3.Row) -> str:
     """Format an event line for output."""
     thread_value = "-" if event["thread_no"] is None else str(event["thread_no"])
@@ -468,9 +466,12 @@ def parse_comment(parts: list[str], required: bool) -> str | None:
 
 def cmd_create(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     """Create a review if allowed."""
+    review_id = args.review_id
+    validate_review_id(review_id)
     scope = parse_scope(args.scope)
     with write_transaction(conn):
-        review_id = generate_review_id(conn)
+        if fetch_review(conn, review_id):
+            raise ReviewError("review with this ID already exists")
         conn.execute(
             "INSERT INTO reviews(id, scope, status, created_at) VALUES (?, ?, 'open', ?)",
             (review_id, scope, now_timestamp()),
@@ -854,8 +855,26 @@ def cmd_wait(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
 
 def add_create_parser(subparsers: Any) -> None:
     """Register the create command."""
-    create_parser = subparsers.add_parser("create", help="Create a review")
-    create_parser.add_argument("scope", nargs=argparse.REMAINDER)
+    create_parser = subparsers.add_parser(
+        "create",
+        help="Create a review",
+        description=(
+            "Create a new review session with the specified ID and scope. "
+            "The scope defines what is being reviewed (e.g., a feature, a file, or a set of changes). "
+            "On success, the review ID is printed to stdout and can be used to join or manage the review."
+        ),
+    )
+    create_parser.add_argument(
+        "--id",
+        dest="review_id",
+        required=True,
+        help="Unique review identifier (alphanumeric, underscores, dashes; no spaces)",
+    )
+    create_parser.add_argument(
+        "scope",
+        nargs=argparse.REMAINDER,
+        help="Description of what is being reviewed; can also be piped via stdin",
+    )
     create_parser.set_defaults(func=cmd_create)
 
 

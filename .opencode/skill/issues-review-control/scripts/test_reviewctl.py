@@ -37,9 +37,15 @@ def run_command(argv: list[str]) -> tuple[int, str, str]:
     return code, stdout.getvalue().rstrip("\n"), stderr.getvalue().rstrip("\n")
 
 
-def create_review(scope: str) -> str:
+_review_counter: list[int] = [0]
+
+
+def create_review(scope: str, review_id: str | None = None) -> str:
     """Create a review and return its id."""
-    code, stdout, stderr = run_command(["create", scope])
+    if review_id is None:
+        _review_counter[0] += 1
+        review_id = f"test-{_review_counter[0]:04d}"
+    code, stdout, stderr = run_command(["create", "--id", review_id, scope])
     assert code == 0
     assert stderr == ""
     return stdout
@@ -55,11 +61,11 @@ def join_review(review_id: str, name: str, role: str) -> str:
 
 def test_create_and_join_flow(review_home: Path) -> None:
     """Create a review and join it."""
-    code, stdout, stderr = run_command(["create", "Review scope"])
+    code, stdout, stderr = run_command(["create", "--id", "my-review", "Review scope"])
     assert code == 0
     assert stderr == ""
     review_id = stdout
-    assert len(review_id) == 8
+    assert review_id == "my-review"
 
     code, stdout, stderr = run_command(["join", review_id, "--name", "alex", "--role", "reviewer"])
     assert code == 0
@@ -67,18 +73,26 @@ def test_create_and_join_flow(review_home: Path) -> None:
     assert stdout == f"alex-{review_id}"
 
 
-def test_create_returns_unique_ids(review_home: Path) -> None:
-    """Return unique ids for each create call."""
-    first_id = create_review("Scope alpha")
-    second_id = create_review("Scope alpha")
-    assert first_id != second_id
+def test_create_rejects_duplicate_id(review_home: Path) -> None:
+    """Reject creating a review with an existing ID."""
+    create_review("Scope alpha", review_id="dup-test")
+    code, _stdout, stderr = run_command(["create", "--id", "dup-test", "Scope beta"])
+    assert code == 1
+    assert "review with this ID already exists" in stderr
 
 
 def test_create_requires_scope_text(review_home: Path) -> None:
     """Reject creating a review without scope text."""
-    code, _stdout, stderr = run_command(["create"])
+    code, _stdout, stderr = run_command(["create", "--id", "no-scope"])
     assert code == 1
     assert "scope text is required" in stderr
+
+
+def test_create_rejects_invalid_id_format(review_home: Path) -> None:
+    """Reject creating a review with invalid ID format."""
+    code, _stdout, stderr = run_command(["create", "--id", "invalid id!", "Scope"])
+    assert code == 1
+    assert "alphanumeric characters, underscores, or dashes" in stderr
 
 
 def test_join_requires_create(review_home: Path) -> None:

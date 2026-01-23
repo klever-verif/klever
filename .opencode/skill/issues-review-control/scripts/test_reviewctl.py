@@ -150,7 +150,7 @@ def test_comment_resolved_thread_errors(review_home: Path) -> None:
     token = join_review(review_id, "alex", "reviewer")
     run_command(["threads", "create", "--token", token])
     run_command(["threads", "comment", "--token", token, "-n", "0", "Thread open"])
-    run_command(["threads", "resolve", "--token", token, "-n", "0"])
+    run_command(["threads", "resolve", "--token", token, "-n", "0", "--force"])
     code, _stdout, stderr = run_command(["threads", "comment", "--token", token, "-n", "0", "Nope"])
     assert code == 1
     assert "thread is resolved" in stderr
@@ -170,6 +170,7 @@ def test_all_threads_resolved_event(review_home: Path) -> None:
     reviewee = join_review(review_id, "sam", "reviewee")
     run_command(["threads", "create", "--token", reviewer])
     run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Note"])
+    run_command(["threads", "comment", "--token", reviewee, "-n", "0", "Reply"])
     run_command(["threads", "resolve", "--token", reviewer, "-n", "0"])
     code, stdout, _stderr = run_command(["wait", "--token", reviewee])
     assert code == 0
@@ -201,12 +202,16 @@ def test_resolve_missing_thread_errors(review_home: Path) -> None:
 def test_resolve_accepts_optional_comment(review_home: Path) -> None:
     """Allow resolving threads with a comment."""
     review_id = create_review("Scope resolve comment")
-    token = join_review(review_id, "alex", "reviewer")
-    run_command(["threads", "create", "--token", token])
-    run_command(["threads", "comment", "--token", token, "-n", "0", "Open thread"])
-    code, stdout, _stderr = run_command(["threads", "comment", "--token", token, "-n", "0", "--resolve", "Final note"])
+    reviewer = join_review(review_id, "alex", "reviewer")
+    reviewee = join_review(review_id, "sam", "reviewee")
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Open thread"])
+    run_command(["threads", "comment", "--token", reviewee, "-n", "0", "Reply"])
+    code, stdout, _stderr = run_command(
+        ["threads", "comment", "--token", reviewer, "-n", "0", "--resolve", "Final note"]
+    )
     assert code == 0
-    assert stdout == "thread: 0 comments: 2"
+    assert stdout == "thread: 0 comments: 3"
 
 
 def test_close_requires_resolved_threads(review_home: Path) -> None:
@@ -239,7 +244,7 @@ def test_close_success_summary(review_home: Path) -> None:
     reviewer = join_review(review_id, "alex", "reviewer")
     run_command(["threads", "create", "--token", reviewer])
     run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Open thread"])
-    run_command(["threads", "resolve", "--token", reviewer, "-n", "0"])
+    run_command(["threads", "resolve", "--token", reviewer, "-n", "0", "--force"])
     code, stdout, _stderr = run_command(["close", "--token", reviewer])
     assert code == 0
     assert f"review: id={review_id} status=closed" in stdout
@@ -283,7 +288,7 @@ def test_view_by_id_after_close(review_home: Path) -> None:
     token = join_review(review_id, "alex", "reviewer")
     run_command(["threads", "create", "--token", token])
     run_command(["threads", "comment", "--token", token, "-n", "0", "First"])
-    run_command(["threads", "resolve", "--token", token, "-n", "0"])
+    run_command(["threads", "resolve", "--token", token, "-n", "0", "--force"])
     run_command(["close", "--token", token])
     code, stdout, _stderr = run_command(["view", "--id", review_id])
     assert code == 0
@@ -404,8 +409,8 @@ def test_resolve_rejects_resolved_thread(review_home: Path) -> None:
     token = join_review(review_id, "alex", "reviewer")
     run_command(["threads", "create", "--token", token])
     run_command(["threads", "comment", "--token", token, "-n", "0", "Open thread"])
-    run_command(["threads", "resolve", "--token", token, "-n", "0"])
-    code, _stdout, stderr = run_command(["threads", "resolve", "--token", token, "-n", "0"])
+    run_command(["threads", "resolve", "--token", token, "-n", "0", "--force"])
+    code, _stdout, stderr = run_command(["threads", "resolve", "--token", token, "-n", "0", "--force"])
     assert code == 1
     assert "thread is resolved" in stderr
 
@@ -441,7 +446,7 @@ def test_comment_rejects_closed_review(review_home: Path) -> None:
     token = join_review(review_id, "alex", "reviewer")
     run_command(["threads", "create", "--token", token])
     run_command(["threads", "comment", "--token", token, "-n", "0", "Open thread"])
-    run_command(["threads", "resolve", "--token", token, "-n", "0"])
+    run_command(["threads", "resolve", "--token", token, "-n", "0", "--force"])
     run_command(["close", "--token", token])
     code, _stdout, stderr = run_command(["threads", "comment", "--token", token, "-n", "0", "Nope"])
     assert code == 1
@@ -514,12 +519,14 @@ def test_comment_rejects_negative_thread(review_home: Path) -> None:
 def test_resolve_allows_no_comment(review_home: Path) -> None:
     """Allow resolving threads without a comment."""
     review_id = create_review("Scope resolve no comment")
-    token = join_review(review_id, "alex", "reviewer")
-    run_command(["threads", "create", "--token", token])
-    run_command(["threads", "comment", "--token", token, "-n", "0", "Open thread"])
-    code, stdout, _stderr = run_command(["threads", "resolve", "--token", token, "-n", "0"])
+    reviewer = join_review(review_id, "alex", "reviewer")
+    reviewee = join_review(review_id, "sam", "reviewee")
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Open thread"])
+    run_command(["threads", "comment", "--token", reviewee, "-n", "0", "Reply"])
+    code, stdout, _stderr = run_command(["threads", "resolve", "--token", reviewer, "-n", "0"])
     assert code == 0
-    assert stdout == "thread: 0 comments: 1"
+    assert stdout == "thread: 0 comments: 2"
 
 
 def test_resolve_rejects_invalid_token(review_home: Path) -> None:
@@ -597,6 +604,7 @@ def test_wait_receives_resolve_event_with_comment(review_home: Path) -> None:
     reviewee = join_review(review_id, "sam", "reviewee")
     run_command(["threads", "create", "--token", reviewer])
     run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Open thread"])
+    run_command(["threads", "comment", "--token", reviewee, "-n", "0", "Reply"])
     run_command(["threads", "comment", "--token", reviewer, "-n", "0", "--resolve", "Done"])
     code, stdout, _stderr = run_command(["wait", "--token", reviewee])
     assert code == 0
@@ -604,7 +612,7 @@ def test_wait_receives_resolve_event_with_comment(review_home: Path) -> None:
     resolved_line = next(line for line in lines if "event: thread_resolved" in line)
     assert "thread:0" in resolved_line
     assert "author_role:reviewer" in resolved_line
-    assert "count:2" in resolved_line
+    assert "count:3" in resolved_line
     assert "with_comment:1" in resolved_line
 
 
@@ -631,3 +639,66 @@ def test_wait_receives_review_closed_event(review_home: Path) -> None:
     assert "author_role:reviewer" in closed_line
     assert "thread:-" in closed_line
     assert "count:-" in closed_line
+
+
+def test_resolve_requires_reviewee_response(review_home: Path) -> None:
+    """Reject resolving thread without reviewee response."""
+    review_id = create_review("Scope resolve no reviewee")
+    reviewer = join_review(review_id, "alex", "reviewer")
+    join_review(review_id, "sam", "reviewee")
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Open thread"])
+    code, _stdout, stderr = run_command(["threads", "resolve", "--token", reviewer, "-n", "0"])
+    assert code == 1
+    assert "cannot resolve thread without reviewee response" in stderr
+
+
+def test_resolve_force_bypasses_reviewee_check(review_home: Path) -> None:
+    """Allow resolving thread with --force without reviewee response."""
+    review_id = create_review("Scope resolve force")
+    reviewer = join_review(review_id, "alex", "reviewer")
+    join_review(review_id, "sam", "reviewee")
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Open thread"])
+    code, stdout, _stderr = run_command(["threads", "resolve", "--token", reviewer, "-n", "0", "--force"])
+    assert code == 0
+    assert stdout == "thread: 0 comments: 1"
+
+
+def test_resolve_with_comment_requires_reviewee_response(review_home: Path) -> None:
+    """Reject resolving with comment without reviewee response."""
+    review_id = create_review("Scope resolve comment no reviewee")
+    reviewer = join_review(review_id, "alex", "reviewer")
+    join_review(review_id, "sam", "reviewee")
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Open thread"])
+    code, _stdout, stderr = run_command(["threads", "comment", "--token", reviewer, "-n", "0", "--resolve", "Final"])
+    assert code == 1
+    assert "cannot resolve thread without reviewee response" in stderr
+
+
+def test_resolve_with_comment_force_bypasses_check(review_home: Path) -> None:
+    """Allow resolving with comment and --force without reviewee response."""
+    review_id = create_review("Scope resolve comment force")
+    reviewer = join_review(review_id, "alex", "reviewer")
+    join_review(review_id, "sam", "reviewee")
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Open thread"])
+    code, stdout, _stderr = run_command(
+        ["threads", "comment", "--token", reviewer, "-n", "0", "--resolve", "--force", "Final"]
+    )
+    assert code == 0
+    assert stdout == "thread: 0 comments: 2"
+
+
+def test_resolve_succeeds_after_reviewee_comment(review_home: Path) -> None:
+    """Allow resolving thread after reviewee has commented."""
+    review_id = create_review("Scope resolve after reviewee")
+    reviewer = join_review(review_id, "alex", "reviewer")
+    reviewee = join_review(review_id, "sam", "reviewee")
+    run_command(["threads", "create", "--token", reviewer])
+    run_command(["threads", "comment", "--token", reviewer, "-n", "0", "Open thread"])
+    run_command(["threads", "comment", "--token", reviewee, "-n", "0", "Reply"])
+    code, stdout, _stderr = run_command(["threads", "resolve", "--token", reviewer, "-n", "0"])
+    assert code == 0
+    assert stdout == "thread: 0 comments: 2"

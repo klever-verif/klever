@@ -302,6 +302,20 @@ def count_comments_for_thread(conn: sqlite3.Connection, thread_id: int) -> int:
     return int(row["count"])
 
 
+def has_reviewee_comment(conn: sqlite3.Connection, thread_id: int) -> bool:
+    """Check if any reviewee has commented on the thread."""
+    row = conn.execute(
+        """
+        SELECT 1 FROM comments
+        JOIN participants ON participants.token = comments.author_token
+        WHERE comments.thread_id = ? AND participants.role = 'reviewee'
+        LIMIT 1
+        """,
+        (thread_id,),
+    ).fetchone()
+    return row is not None
+
+
 def count_comments_for_review(conn: sqlite3.Connection, review_id: str) -> int:
     """Count comments for a review."""
     row = conn.execute(
@@ -564,6 +578,8 @@ def cmd_threads_comment(conn: sqlite3.Connection, args: argparse.Namespace) -> N
         if args.resolve:
             if thread["author_token"] != participant["token"]:
                 raise ReviewError("token cannot resolve this thread")
+            if not args.force and not has_reviewee_comment(conn, thread["id"]):
+                raise ReviewError("cannot resolve thread without reviewee response")
             conn.execute(
                 "UPDATE threads SET status = 'resolved', resolved_at = ? WHERE id = ?",
                 (now_timestamp(), thread["id"]),
@@ -611,6 +627,8 @@ def cmd_threads_resolve(conn: sqlite3.Connection, args: argparse.Namespace) -> N
             raise ReviewError("thread is resolved")
         if thread["author_token"] != participant["token"]:
             raise ReviewError("token cannot resolve this thread")
+        if not args.force and not has_reviewee_comment(conn, thread["id"]):
+            raise ReviewError("cannot resolve thread without reviewee response")
         comment_count = count_comments_for_thread(conn, thread["id"])
         conn.execute(
             "UPDATE threads SET status = 'resolved', resolved_at = ? WHERE id = ?",
@@ -891,12 +909,14 @@ def add_threads_parsers(subparsers: Any) -> None:
     threads_comment.add_argument("--token", required=True)
     threads_comment.add_argument("-n", "--thread", type=int, required=True)
     threads_comment.add_argument("--resolve", action="store_true")
+    threads_comment.add_argument("--force", action="store_true", help="Resolve even without reviewee response")
     threads_comment.add_argument("comment", nargs=argparse.REMAINDER)
     threads_comment.set_defaults(func=cmd_threads_comment)
 
     threads_resolve = threads_subparsers.add_parser("resolve", help="Resolve a thread")
     threads_resolve.add_argument("--token", required=True)
     threads_resolve.add_argument("-n", "--thread", type=int, required=True)
+    threads_resolve.add_argument("--force", action="store_true", help="Resolve even without reviewee response")
     threads_resolve.set_defaults(func=cmd_threads_resolve)
 
     threads_list = threads_subparsers.add_parser("list", help="List threads")

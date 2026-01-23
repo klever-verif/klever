@@ -230,22 +230,22 @@ def fetch_participant(conn: sqlite3.Connection, token: str) -> sqlite3.Row | Non
 
 def resolve_review_from_args(
     conn: sqlite3.Connection,
-    token: str | None,
+    user: str | None,
     review_id: str | None,
 ) -> sqlite3.Row:
-    """Resolve a review based on token or ID."""
-    if token and review_id is not None:
-        raise ReviewError("use either --token or --id")
-    if token is None and review_id is None:
-        raise ReviewError("--id is required when --token is not used")
-    if token:
-        participant = fetch_participant(conn, token)
+    """Resolve a review based on user id or review ID."""
+    if user and review_id is not None:
+        raise ReviewError("use either --user or --id")
+    if user is None and review_id is None:
+        raise ReviewError("--id is required when --user is not used")
+    if user:
+        participant = fetch_participant(conn, user)
         if not participant:
-            raise ReviewError("invalid token")
+            raise ReviewError("invalid user id")
         review = fetch_review(conn, participant["review_id"])
     else:
         if review_id is None:
-            raise ReviewError("--id is required when --token is not used")
+            raise ReviewError("--id is required when --user is not used")
         review = fetch_review(conn, review_id)
     if not review:
         raise ReviewError("review does not exist")
@@ -515,9 +515,9 @@ def cmd_join(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
 def cmd_threads_create(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     """Create a new thread for a review."""
     with write_transaction(conn):
-        participant = fetch_participant(conn, args.token)
+        participant = fetch_participant(conn, args.user)
         if not participant:
-            raise ReviewError("invalid token")
+            raise ReviewError("invalid user id")
         review = fetch_review(conn, participant["review_id"])
         if review is None or review["status"] == "closed":
             raise ReviewError("review is closed")
@@ -557,9 +557,9 @@ def cmd_threads_comment(conn: sqlite3.Connection, args: argparse.Namespace) -> N
         raise ReviewError("comment text is required")
     validate_non_negative(args.thread, "thread")
     with write_transaction(conn):
-        participant = fetch_participant(conn, args.token)
+        participant = fetch_participant(conn, args.user)
         if not participant:
-            raise ReviewError("invalid token")
+            raise ReviewError("invalid user id")
         review = fetch_review(conn, participant["review_id"])
         if review is None or review["status"] == "closed":
             raise ReviewError("review is closed")
@@ -578,7 +578,7 @@ def cmd_threads_comment(conn: sqlite3.Connection, args: argparse.Namespace) -> N
         comment_count = count_comments_for_thread(conn, thread["id"])
         if args.resolve:
             if thread["author_token"] != participant["token"]:
-                raise ReviewError("token cannot resolve this thread")
+                raise ReviewError("user cannot resolve this thread")
             if not args.force and not has_reviewee_comment(conn, thread["id"]):
                 raise ReviewError("cannot resolve thread without reviewee response")
             conn.execute(
@@ -615,9 +615,9 @@ def cmd_threads_resolve(conn: sqlite3.Connection, args: argparse.Namespace) -> N
     """Resolve a thread."""
     validate_non_negative(args.thread, "thread")
     with write_transaction(conn):
-        participant = fetch_participant(conn, args.token)
+        participant = fetch_participant(conn, args.user)
         if not participant:
-            raise ReviewError("invalid token")
+            raise ReviewError("invalid user id")
         review = fetch_review(conn, participant["review_id"])
         if review is None or review["status"] == "closed":
             raise ReviewError("review is closed")
@@ -627,7 +627,7 @@ def cmd_threads_resolve(conn: sqlite3.Connection, args: argparse.Namespace) -> N
         if thread["status"] == "resolved":
             raise ReviewError("thread is resolved")
         if thread["author_token"] != participant["token"]:
-            raise ReviewError("token cannot resolve this thread")
+            raise ReviewError("user cannot resolve this thread")
         if not args.force and not has_reviewee_comment(conn, thread["id"]):
             raise ReviewError("cannot resolve thread without reviewee response")
         comment_count = count_comments_for_thread(conn, thread["id"])
@@ -653,11 +653,11 @@ def cmd_threads_resolve(conn: sqlite3.Connection, args: argparse.Namespace) -> N
 def cmd_close(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     """Close a review if all threads are resolved."""
     with write_transaction(conn):
-        participant = fetch_participant(conn, args.token)
+        participant = fetch_participant(conn, args.user)
         if not participant:
-            raise ReviewError("invalid token")
+            raise ReviewError("invalid user id")
         if participant["role"] != "reviewer":
-            raise ReviewError("token cannot close the review")
+            raise ReviewError("user cannot close the review")
         review = fetch_review(conn, participant["review_id"])
         if review is None or review["status"] == "closed":
             raise ReviewError("review is closed")
@@ -747,7 +747,7 @@ def cmd_view(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     thread_no = getattr(args, "thread", None)
     if thread_no is not None:
         validate_non_negative(thread_no, "thread")
-    review = resolve_review_from_args(conn, args.token, args.review_id)
+    review = resolve_review_from_args(conn, args.user, args.review_id)
     lines = [f"# review-{review['id']} {review['status']}"]
     lines.extend(review["scope"].splitlines())
     if thread_no is not None:
@@ -783,7 +783,7 @@ def cmd_list(conn: sqlite3.Connection, _args: argparse.Namespace) -> None:
 
 def cmd_threads_list(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     """List threads for a review."""
-    review = resolve_review_from_args(conn, args.token, args.review_id)
+    review = resolve_review_from_args(conn, args.user, args.review_id)
     threads = conn.execute(
         "SELECT * FROM threads WHERE review_id = ? ORDER BY thread_no ASC",
         (review["id"],),
@@ -808,7 +808,7 @@ def cmd_threads_list(conn: sqlite3.Connection, args: argparse.Namespace) -> None
 def cmd_threads_view(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     """View a single thread."""
     validate_non_negative(args.thread, "thread")
-    review = resolve_review_from_args(conn, args.token, args.review_id)
+    review = resolve_review_from_args(conn, args.user, args.review_id)
     thread = fetch_thread(conn, review["id"], args.thread)
     if not thread:
         raise ReviewError("thread does not exist")
@@ -820,16 +820,16 @@ def cmd_threads_view(conn: sqlite3.Connection, args: argparse.Namespace) -> None
 
 def cmd_wait(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     """Wait for review events for a participant."""
-    participant = fetch_participant(conn, args.token)
+    participant = fetch_participant(conn, args.user)
     if not participant:
-        raise ReviewError("invalid token")
+        raise ReviewError("invalid user id")
     review = fetch_review(conn, participant["review_id"])
     if review is None or review["status"] == "closed":
         raise ReviewError("review is closed")
     while True:
-        participant = fetch_participant(conn, args.token)
+        participant = fetch_participant(conn, args.user)
         if not participant:
-            raise ReviewError("invalid token")
+            raise ReviewError("invalid user id")
         events = conn.execute(
             """
             SELECT * FROM events
@@ -912,7 +912,7 @@ def add_join_parser(subparsers: Any) -> None:
 def add_close_parser(subparsers: Any) -> None:
     """Register the close command."""
     close_parser = subparsers.add_parser("close", help="Close a review")
-    close_parser.add_argument("--token", required=True)
+    close_parser.add_argument("--user", required=True)
     close_parser.set_defaults(func=cmd_close)
 
 
@@ -926,7 +926,7 @@ def add_status_parser(subparsers: Any) -> None:
 def add_view_parser(subparsers: Any) -> None:
     """Register the view command."""
     view_parser = subparsers.add_parser("view", help="View review contents")
-    view_parser.add_argument("--token")
+    view_parser.add_argument("--user")
     view_parser.add_argument("--id", dest="review_id")
     view_parser.set_defaults(func=cmd_view)
 
@@ -943,11 +943,11 @@ def add_threads_parsers(subparsers: Any) -> None:
     threads_subparsers = threads_parser.add_subparsers(dest="threads_command", required=True)
 
     threads_create = threads_subparsers.add_parser("create", help="Create a thread")
-    threads_create.add_argument("--token", required=True)
+    threads_create.add_argument("--user", required=True)
     threads_create.set_defaults(func=cmd_threads_create)
 
     threads_comment = threads_subparsers.add_parser("comment", help="Add a comment to a thread")
-    threads_comment.add_argument("--token", required=True)
+    threads_comment.add_argument("--user", required=True)
     threads_comment.add_argument("-n", "--thread", type=int, required=True)
     threads_comment.add_argument("--resolve", action="store_true")
     threads_comment.add_argument("--force", action="store_true", help="Resolve even without reviewee response")
@@ -955,18 +955,18 @@ def add_threads_parsers(subparsers: Any) -> None:
     threads_comment.set_defaults(func=cmd_threads_comment)
 
     threads_resolve = threads_subparsers.add_parser("resolve", help="Resolve a thread")
-    threads_resolve.add_argument("--token", required=True)
+    threads_resolve.add_argument("--user", required=True)
     threads_resolve.add_argument("-n", "--thread", type=int, required=True)
     threads_resolve.add_argument("--force", action="store_true", help="Resolve even without reviewee response")
     threads_resolve.set_defaults(func=cmd_threads_resolve)
 
     threads_list = threads_subparsers.add_parser("list", help="List threads")
-    threads_list.add_argument("--token")
+    threads_list.add_argument("--user")
     threads_list.add_argument("--id", dest="review_id")
     threads_list.set_defaults(func=cmd_threads_list)
 
     threads_view = threads_subparsers.add_parser("view", help="View a thread")
-    threads_view.add_argument("--token")
+    threads_view.add_argument("--user")
     threads_view.add_argument("--id", dest="review_id")
     threads_view.add_argument("-n", "--thread", type=int, required=True)
     threads_view.set_defaults(func=cmd_threads_view)
@@ -975,7 +975,7 @@ def add_threads_parsers(subparsers: Any) -> None:
 def add_wait_parser(subparsers: Any) -> None:
     """Register the wait command."""
     wait_parser = subparsers.add_parser("wait", help="Wait for review events")
-    wait_parser.add_argument("--token", required=True)
+    wait_parser.add_argument("--user", required=True)
     wait_parser.set_defaults(func=cmd_wait)
 
 

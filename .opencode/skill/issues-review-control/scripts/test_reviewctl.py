@@ -442,6 +442,33 @@ def test_status_reports_counts(review_home: Path) -> None:
     assert "participants: reviewers=1 reviewees=0" in stdout
 
 
+def test_status_with_user_token(review_home: Path) -> None:
+    """Report status using participant token."""
+    review_id = create_review("Scope status user")
+    reviewer = join_review(review_id, "alex", "reviewer")
+    run_command(["threads", "create", "--user", reviewer])
+    code, stdout, _stderr = run_command(["status", "--user", reviewer])
+    assert code == 0
+    assert f"review: id={review_id} status=open" in stdout
+    assert "threads: open=1 resolved=0 comments=0" in stdout
+
+
+def test_status_rejects_missing_args(review_home: Path) -> None:
+    """Reject status without --user or --id."""
+    code, _stdout, stderr = run_command(["status"])
+    assert code == 1
+    assert "--id is required when --user is not used" in stderr
+
+
+def test_status_rejects_both_args(review_home: Path) -> None:
+    """Reject status with both --user and --id."""
+    review_id = create_review("Scope status both")
+    reviewer = join_review(review_id, "alex", "reviewer")
+    code, _stdout, stderr = run_command(["status", "--user", reviewer, "--id", review_id])
+    assert code == 1
+    assert "use either --user or --id" in stderr
+
+
 def test_threads_list_shows_status(review_home: Path) -> None:
     """List threads with status output."""
     review_id = create_review("Scope threads list")

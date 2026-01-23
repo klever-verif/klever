@@ -699,9 +699,7 @@ def cmd_close(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
 
 def cmd_status(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     """Show review status and counts."""
-    review = fetch_review(conn, args.review_id)
-    if not review:
-        raise ReviewError("review does not exist")
+    review = resolve_review_from_args(conn, args.user, args.review_id)
     open_threads = count_threads_by_status(conn, review["id"], "open")
     resolved_threads = count_threads_by_status(conn, review["id"], "resolved")
     comments_count = count_comments_for_review(conn, review["id"])
@@ -937,8 +935,24 @@ def add_close_parser(subparsers: Any) -> None:
 
 def add_status_parser(subparsers: Any) -> None:
     """Register the status command."""
-    status_parser = subparsers.add_parser("status", help="Show review status")
-    status_parser.add_argument("--id", dest="review_id", required=True)
+    status_parser = subparsers.add_parser(
+        "status",
+        help="Show review status",
+        description=(
+            "Show the current status of a review session including thread counts, "
+            "comment counts, and participant information. "
+            "Specify either --user (participant token) or --id (review ID), but not both."
+        ),
+    )
+    status_parser.add_argument(
+        "--user",
+        help="Participant token to identify the review",
+    )
+    status_parser.add_argument(
+        "--id",
+        dest="review_id",
+        help="Review ID to show status for",
+    )
     status_parser.set_defaults(func=cmd_status)
 
 

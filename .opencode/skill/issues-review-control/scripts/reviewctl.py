@@ -1052,7 +1052,6 @@ def add_threads_parsers(subparsers: Any) -> None:
         help="Participant token of the commenter",
     )
     threads_comment.add_argument(
-        "-n",
         "--thread",
         type=int,
         required=True,
@@ -1086,7 +1085,6 @@ def add_threads_parsers(subparsers: Any) -> None:
         help="Participant token (must be the thread author)",
     )
     threads_resolve.add_argument(
-        "-n",
         "--thread",
         type=int,
         required=True,
@@ -1140,7 +1138,6 @@ def add_threads_parsers(subparsers: Any) -> None:
         help="Review ID containing the thread",
     )
     threads_view.add_argument(
-        "-n",
         "--thread",
         type=int,
         required=True,

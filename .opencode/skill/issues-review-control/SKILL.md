@@ -49,8 +49,8 @@ Add a comment to a thread; comments can be passed via args or stdin.
 
 Examples:
 ```bash
-.opencode/skill/issues-review-control/scripts/reviewctl.py threads comment --token alex-abcdef12 -n 0 "Note"
-printf "Note" | .opencode/skill/issues-review-control/scripts/reviewctl.py threads comment --token alex-abcdef12 -n 0
+.opencode/skill/issues-review-control/scripts/reviewctl.py threads comment --token alex-abcdef12 --thread 0 "Note"
+printf "Note" | .opencode/skill/issues-review-control/scripts/reviewctl.py threads comment --token alex-abcdef12 --thread 0
 ```
 
 ## View thread
@@ -58,7 +58,7 @@ Render a single thread for a review.
 
 Example:
 ```bash
-.opencode/skill/issues-review-control/scripts/reviewctl.py threads view --token alex-abcdef12 -n 0
+.opencode/skill/issues-review-control/scripts/reviewctl.py threads view --token alex-abcdef12 --thread 0
 ```
 
 ## Resolve thread (reviewer only)
@@ -66,8 +66,8 @@ Reviewers resolve their own threads, optionally with a comment.
 
 Examples:
 ```bash
-.opencode/skill/issues-review-control/scripts/reviewctl.py threads resolve --token alex-abcdef12 -n 0
-.opencode/skill/issues-review-control/scripts/reviewctl.py threads comment --token alex-abcdef12 -n 0 --resolve "Fix applied"
+.opencode/skill/issues-review-control/scripts/reviewctl.py threads resolve --token alex-abcdef12 --thread 0
+.opencode/skill/issues-review-control/scripts/reviewctl.py threads comment --token alex-abcdef12 --thread 0 --resolve "Fix applied"
 ```
 
 ## View whole review

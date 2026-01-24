@@ -36,4 +36,3 @@
 - Storage lives in `.memory/` and is persistent; rules: `.memory/AGENTS.md`.
 - Global backlog: `.memory/TODO.md` (simple bullet list).
 - Issue workspace: `.memory/issues/` (rules: `.memory/issues/AGENTS.md`).
-- Templates: `.memory/templates/`.

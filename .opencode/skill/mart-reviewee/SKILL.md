@@ -19,11 +19,11 @@ Load `mart-cli` skill to learn how to use the tool.
 
 ## Workflow
 1. Check that review is already open, otherwise create it.
-2. Join the review as reviewee. Remember the token and your name.
+2. Join the review as reviewee (pick some short human name). Remember the token and your name.
 3. Start acting reactively in a loop (steps 4-9) by putting steps into your ToDo list and iterate through.
 4. Wait for new events - you expect reviewers create threads and leave comments.
 5. Inspect registered events from top (earlier) to bottom.
 6. Check for new threads or comments, review them and provide answers.
-7. Update your todo list with action items extracted from review. Mark them as [AR].
+7. Update your todo list with action items extracted from review. Mark them as [AR] (Action Requested).
 8. Check for all threads are resolved. If true, then the reviewer is satisfied at the moment, so break the loop and go to step 10. Otherwise, go to the next iteration of the loop (step 4).
 10. Analyze the whole review text, update action items and provide the list to the user for approval.

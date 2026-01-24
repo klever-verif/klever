@@ -3,6 +3,10 @@ name: mart-cli
 description: Use when the user mentions Multi Agent Review Tool (MART or `mart`.py) or simply the review tool, or asks for a formal or multi-agent review.
 ---
 
+<critical>
+User need to assign you a specific role of reviewer/reviewee. Clarify it before executing any commands. Load appropriate skill.
+</critical>
+
 ## Check for open review
 Use `<skill_dir>/scripts/mart.py list` to see open reviews. Output shows the review `id`, status, open thread count, comment count, and the first line of the scope.
 
@@ -30,6 +34,10 @@ Example:
 
 ## Wait for events
 Use your token to wait for new events. Returns when new events arrive.
+
+<critical>
+When invoking `mart.py wait` through `bash` tool setup 10 minutes (600000 ms) timeout.
+</critical>
 
 Example:
 ```bash

@@ -21,7 +21,7 @@ Load `mart-cli` skill to learn how to use the tool.
 
 ## Workflow
 1. Check that review is already open, otherwise create it.
-2. Join the review as reviewer. Remember the token and your name.
+2. Join the review as reviewer (pick some short human name). Remember the token and your name.
 3. Start acting in a loop (steps 4-10).
 4. Thoroughly review the provided scope of changes before touching the review tool.
 5. Check already open threads if any to not duplicate issues.

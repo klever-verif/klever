@@ -46,6 +46,7 @@ Example:
 
 ## Comment thread
 Add a comment to a thread; comments can be passed via args or stdin.
+Participants cannot leave two consecutive comments in the same thread.
 
 Examples:
 ```bash

@@ -308,6 +308,15 @@ def count_comments_for_thread(conn: sqlite3.Connection, thread_id: int) -> int:
     return int(row["count"])
 
 
+def fetch_last_comment_author(conn: sqlite3.Connection, thread_id: int) -> str | None:
+    """Return the last comment author token for a thread."""
+    row = conn.execute(
+        "SELECT author_token FROM comments WHERE thread_id = ? ORDER BY id DESC LIMIT 1",
+        (thread_id,),
+    ).fetchone()
+    return str(row["author_token"]) if row else None
+
+
 def has_reviewee_comment(conn: sqlite3.Connection, thread_id: int) -> bool:
     """Check if any reviewee has commented on the thread."""
     row = conn.execute(
@@ -568,6 +577,9 @@ def cmd_threads_comment(conn: sqlite3.Connection, args: argparse.Namespace) -> N
             raise ReviewError("thread does not exist")
         if thread["status"] == "resolved":
             raise ReviewError("thread is resolved")
+        last_author = fetch_last_comment_author(conn, thread["id"])
+        if last_author == participant["token"]:
+            raise ReviewError("user cannot comment twice in a row")
         conn.execute(
             """
             INSERT INTO comments(thread_id, author_token, body, created_at)

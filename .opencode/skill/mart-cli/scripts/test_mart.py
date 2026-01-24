@@ -177,6 +177,17 @@ def test_comment_invalid_token_errors(review_home: Path) -> None:
     assert "invalid user id" in stderr
 
 
+def test_comment_rejects_consecutive_author(review_home: Path) -> None:
+    """Reject consecutive comments from the same author."""
+    review_id = create_review("Scope comment consecutive")
+    token = join_review(review_id, "alex", "reviewer")
+    run_command(["threads", "create", "--user", token])
+    run_command(["threads", "comment", "--user", token, "--thread", "0", "First"])
+    code, _stdout, stderr = run_command(["threads", "comment", "--user", token, "--thread", "0", "Second"])
+    assert code == 1
+    assert "user cannot comment twice in a row" in stderr
+
+
 def test_all_threads_resolved_event(review_home: Path) -> None:
     """Emit an all threads resolved event when closing threads."""
     review_id = create_review("Scope all resolved")
@@ -379,7 +390,7 @@ def test_wait_consumes_multiple_events(review_home: Path) -> None:
 
     run_command(["threads", "create", "--user", reviewer])
     run_command(["threads", "comment", "--user", reviewer, "--thread", "0", "Open thread"])
-    run_command(["threads", "comment", "--user", reviewer, "--thread", "0", "Follow up"])
+    run_command(["threads", "comment", "--user", reviewee, "--thread", "0", "Follow up"])
 
     code, stdout, _stderr = run_command(["wait", "--user", reviewee])
     assert code == 0
@@ -753,7 +764,6 @@ def test_resolve_with_comment_requires_reviewee_response(review_home: Path) -> N
     reviewer = join_review(review_id, "alex", "reviewer")
     join_review(review_id, "sam", "reviewee")
     run_command(["threads", "create", "--user", reviewer])
-    run_command(["threads", "comment", "--user", reviewer, "--thread", "0", "Open thread"])
     code, _stdout, stderr = run_command(
         ["threads", "comment", "--user", reviewer, "--thread", "0", "--resolve", "Final"]
     )

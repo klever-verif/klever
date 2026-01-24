@@ -12,19 +12,19 @@ from pathlib import Path
 
 import pytest
 
-REVIEW_PATH = Path(__file__).resolve().parent / "reviewctl.py"
-REVIEW_SPEC = util.spec_from_file_location("reviewctl", REVIEW_PATH)
+REVIEW_PATH = Path(__file__).resolve().parent / "mart.py"
+REVIEW_SPEC = util.spec_from_file_location("mart", REVIEW_PATH)
 if REVIEW_SPEC is None or REVIEW_SPEC.loader is None:
     raise RuntimeError("Unable to load review module")
-reviewctl = util.module_from_spec(REVIEW_SPEC)
-sys.modules["reviewctl"] = reviewctl
-REVIEW_SPEC.loader.exec_module(reviewctl)
+mart = util.module_from_spec(REVIEW_SPEC)
+sys.modules["mart"] = mart
+REVIEW_SPEC.loader.exec_module(mart)
 
 
 @pytest.fixture
 def review_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Provide a temporary review home directory."""
-    monkeypatch.setenv(reviewctl.REVIEWCTL_HOME_ENV, str(tmp_path))
+    monkeypatch.setenv(mart.MART_HOME_ENV, str(tmp_path))
     return tmp_path
 
 
@@ -33,7 +33,7 @@ def run_command(argv: list[str]) -> tuple[int, str, str]:
     stdout = StringIO()
     stderr = StringIO()
     with redirect_stdout(stdout), redirect_stderr(stderr):
-        code = reviewctl.main(argv)
+        code = mart.main(argv)
     return code, stdout.getvalue().rstrip("\n"), stderr.getvalue().rstrip("\n")
 
 
@@ -625,7 +625,7 @@ def test_view_rejects_negative_thread(review_home: Path) -> None:
 
 
 def test_view_rejects_missing_review(review_home: Path) -> None:
-    """Reject viewing a missing reviewctl."""
+    """Reject viewing a missing mart."""
     code, _stdout, stderr = run_command(["view", "--review", "deadbeef"])
     assert code == 1
     assert "review does not exist" in stderr
@@ -670,7 +670,7 @@ def test_list_all_includes_closed_reviews(review_home: Path) -> None:
 
 
 def test_close_rejects_already_closed(review_home: Path) -> None:
-    """Reject closing an already closed reviewctl."""
+    """Reject closing an already closed mart."""
     review_id = create_review("Scope close already")
     token = join_review(review_id, "alex", "reviewer")
     run_command(["close", "--user", token])

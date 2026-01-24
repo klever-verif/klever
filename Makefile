@@ -28,7 +28,7 @@ type-check:
 
 ## Run tests with pytest
 test:
-	uv run pytest -n auto tests .opencode/skill/issues-review-control/scripts
+	uv run pytest -n auto tests .opencode/skill/mart-cli/scripts
 
 ## Run tests with coverage (pytest)
 test-coverage:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Review CLI for managing code review sessions."""
+"""Review CLI for managing code multi agent review sessions."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ EVENT_REVIEW_CLOSED = "review_closed"
 EVENT_LOG_PREFIX = "events-"
 EVENT_LOG_SUFFIX = ".log"
 
-REVIEWCTL_HOME_ENV = "REVIEWCTL_HOME"
+MART_HOME_ENV = "MART_HOME"
 DB_FILENAME = "review.db"
 LOG_ROTATION_LIMIT = 2
 
@@ -51,10 +51,10 @@ def eprint(message: str) -> None:
 
 def get_home_dir() -> Path:
     """Return the review storage directory."""
-    override = os.environ.get(REVIEWCTL_HOME_ENV)
+    override = os.environ.get(MART_HOME_ENV)
     if override:
         return Path(override)
-    return Path("~/.klever-review").expanduser()
+    return Path(__file__).parent.joinpath("../.cache").resolve()
 
 
 def open_db() -> sqlite3.Connection:
@@ -1168,7 +1168,7 @@ def add_wait_parser(subparsers: Any) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
-    parser = argparse.ArgumentParser(prog="reviewctl.py")
+    parser = argparse.ArgumentParser(prog="mart.py")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     add_create_parser(subparsers)

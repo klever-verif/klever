@@ -26,9 +26,8 @@ description: Use when you need to do issue/task managing job within `.memory/iss
 
 ## Review Rules
 - The user specifies whether you act as reviewer or reviewee. Ask if missing and follow only that role.
-- The review process is automated with the review tool used by both parties (skill `issues-review-control`).
-- Reviewer workflow relies on skill `issues-reviewer`
-- Reviewee workflow relies on skill `issues-reviewee`
+- Reviewer workflow relies on skill `mart-reviewer`
+- Reviewee workflow relies on skill `mart-reviewee`
 
 ## Workflow
 1. Setup phase
